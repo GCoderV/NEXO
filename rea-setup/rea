@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+set -euo pipefail
+ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+export PATH="$ROOT/runtime/node_modules/node/bin:$PATH"
+exec "$ROOT/runtime/node_modules/node/bin/node" "$ROOT/node_modules/rea-agents/scripts/rea.mjs" "$@"

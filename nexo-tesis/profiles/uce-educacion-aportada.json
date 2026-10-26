@@ -1,0 +1,14 @@
+{
+  "name": "UCE · Educación · Grado · Investigación-acción",
+  "status": "Referencia aportada por el usuario; sin cotejo con guía completa",
+  "source": "ESTRUCTURA DEL ANTEPROYECTO SEGÚN GUÍA UCE.pdf · 3 páginas",
+  "scope": "Anteproyecto hasta planificación del capítulo III. Acción, observación y reflexión pertenecen al desarrollo posterior.",
+  "chapters": [
+    {"title": "I. Aproximación a la Realidad de la Investigación", "page": "1", "sections": ["Descripción del contexto local e institucional", "Constitución del equipo: integrantes", "Descripción de la problemática", "Justificación", "Conceptualización del tema / marco teórico", "Hipótesis de acción", "Objetivos general y específicos"]},
+    {"title": "II. Metodología de Investigación", "page": "2", "sections": ["Constitución del equipo: roles", "Modelo de investigación", "Población", "Técnicas e instrumentos", "Criterios éticos"]},
+    {"title": "III. Ciclo de Investigación-Acción: planificación", "page": "2–3", "sections": ["Diagnóstico de la planificación", "Resultados del diagnóstico", "Diseño del plan de acción"]},
+    {"title": "Complementos", "page": "3", "sections": ["Referencias", "Glosario", "Cronograma y presupuesto", "Modelos de instrumentos"]}
+  ],
+  "format": ["Texto: Times New Roman 12", "Interlineado 1.5", "Títulos: 14, mayúsculas y negrita", "Subtítulos: 14, minúsculas y negrita según el PDF; capitalización exacta por aclarar"],
+  "pending": ["Márgenes, tamaño de página, portada, paginación y sangrías no especificados", "Aclarar doble espacio entre capítulos", "Aclarar cursiva/negrita de referencias y edición APA", "Fuentes de 2006 en adelante: confirmar excepciones para obras clásicas", "El PDF menciona mínimo 12 semanas de campo; confirmar su aplicación y el calendario, no confundir con duración de cada actividad"]
+}

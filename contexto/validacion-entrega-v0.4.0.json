@@ -1,0 +1,71 @@
+{
+  "release": {
+    "file": "/home/user/nexo-tesis-v0.4.0-windows.zip",
+    "files": 106,
+    "bytes": 559243,
+    "sha256": "67ebf1f29d4f6f272b1775d86639c2216fdfc4a84ae31d8cc6a4c683804be14f",
+    "crc_checked": true,
+    "source_equality_checked": true,
+    "runtime_only": true
+  },
+  "source_and_extracted_package": {
+    "unit_total_each": 276,
+    "passed_each": 274,
+    "windows_skipped_each": 2,
+    "functional_tk_each": 98,
+    "optional_screenshots_each": 2,
+    "powershell_baseline_layout_each": 8,
+    "powershell_toc_each": 5,
+    "profile_loader_parser_each": 6
+  },
+  "python": [
+    "3.13 source and extracted",
+    "3.11.17 -S source and extracted"
+  ],
+  "runtime_dependencies": "vendored pypdf 6.21.2 BSD-3-Clause and websocket-client 1.9.2 Apache-2.0",
+  "native_encoded_chars": 27488,
+  "windows_command_encoded_limit": 31000,
+  "preserved_working_connection_functions": {
+    "launch_desktop": true,
+    "launch_auth_window": true,
+    "capture_connection": true,
+    "sanitize_frame": true,
+    "capture_info": true
+  },
+  "prompt_measurement": {
+    "fixture": "synthetic 11 known facts, 11 answered questions, 15 sources, 8 drafts, 8 messages; no actual user content",
+    "comparison": "0.3.1 delivered source vs 0.4.0",
+    "measure": "Unicode characters, not tokens or cost; not a quality benchmark",
+    "cases": [
+      {
+        "case": "dialogue",
+        "old_instruction_characters": 6036,
+        "new_instruction_characters": 1467,
+        "old_context_characters": 16903,
+        "new_context_characters": 11616,
+        "old_total_characters": 22939,
+        "new_total_characters": 13083,
+        "reduction_percent": 42.97
+      },
+      {
+        "case": "draft_revision",
+        "old_instruction_characters": 6036,
+        "new_instruction_characters": 1323,
+        "old_context_characters": 18870,
+        "new_context_characters": 13570,
+        "old_total_characters": 24906,
+        "new_total_characters": 14893,
+        "reduction_percent": 40.2
+      }
+    ]
+  },
+  "limitations": [
+    "No Windows COM/DPAPI/Windows PowerShell 5.1 validation",
+    "No authenticated model or Copilot remote-recall test",
+    "No OCR, native file upload, drag-and-drop or returned-artifact execution",
+    "Guide proposal extraction is partial and pattern-based, user approval required",
+    "Native DOCX reader/format appearance must be tested on a copy in actual Word",
+    "Existing bounded autonomy improved; not an unconstrained general-purpose planner",
+    "No academic quality, citation accuracy or billed-token savings benchmark"
+  ]
+}

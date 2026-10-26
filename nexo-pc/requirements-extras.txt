@@ -1,0 +1,5 @@
+playwright==1.58.0
+PyAutoGUI==0.9.54
+Pillow>=10.4,<13
+pyperclip>=1.9,<2
+pywinauto>=0.6.8,<0.7

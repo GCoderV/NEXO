@@ -1,0 +1,118 @@
+{
+  "schema": 1,
+  "title": "Implementación de una estrategia de aprendizaje cooperativo basada en juegos de roles para fortalecer la producción oral en inglés de los estudiantes de 3.º de secundaria del Centro Educativo Divino Maestro (2026–2027).",
+  "institution": "UCE — Universidad Central del Este",
+  "level": "Grado",
+  "area": "Educación",
+  "method": "Investigación-acción",
+  "period": "2026–2027",
+  "participants": 24,
+  "modality": "escrita y oral",
+  "diagnosis": "Informe narrativo aportado por el docente: conocimientos elementales de vocabulario, expresiones frecuentes y estructuras básicas. Las respuestas de autopercepción indican dificultades con la pronunciación, lectura, gramática y vocabulario; práctica fuera del aula poco frecuente e inseguridad al hablar. No se aportaron frecuencias ni puntuaciones.",
+  "oral_tasks": "Presentación personal básica; entrevista a compañeros; presentación del compañero entrevistado.",
+  "observations": "Pocas dificultades de vocabulario al presentarse; mayor dificultad al formular preguntas; algunas dificultades para expresar el género del compañero presentado. El docente aclara que el dominio es muy bajo para 3.º de secundaria y que el miedo a hablar es la dificultad principal. Conocer expresiones elementales no implica dominio adecuado al grado. No se conocen errores lingüísticos concretos ni se ha cotejado el currículo.",
+  "question": "¿Cómo contribuye una estrategia de aprendizaje cooperativo basada en juegos de roles al fortalecimiento de la producción oral en inglés del grupo durante 2026–2027?",
+  "general_objective": "Fortalecer la producción oral en inglés mediante una estrategia de aprendizaje cooperativo basada en juegos de roles, atendiendo los recursos lingüísticos y la seguridad para participar.",
+  "objectives": [
+    "Diagnosticar el desempeño oral y la seguridad percibida al hablar inglés, distinguiendo observación y autopercepción.",
+    "Diseñar la estrategia a partir de las necesidades del diagnóstico.",
+    "Implementar la estrategia con apoyos lingüísticos y participación progresiva, documentando su desarrollo.",
+    "Analizar los cambios observados en la producción oral y la seguridad percibida, y reflexionar para ajustar la práctica."
+  ],
+  "hypothesis": "Si se implementan juegos de roles cooperativos con preparación lingüística, ensayo y apoyo respetuoso entre compañeros, se espera favorecer la seguridad para participar y el desarrollo de la producción oral. Es una expectativa por evaluar, no una eficacia demostrada.",
+  "evidence": [
+    {
+      "id": "E1",
+      "kind": "autopercepción",
+      "claim": "Miedo e inseguridad al hablar",
+      "detail": "El informe recoge nerviosismo, vergüenza y preferencia por no participar en algunos casos; el docente identifica el miedo como dificultad central.",
+      "count": null,
+      "denominator": null
+    },
+    {
+      "id": "E2",
+      "kind": "observación docente",
+      "claim": "Dominio limitado para el grado",
+      "detail": "Valoración del docente; contraste curricular pendiente.",
+      "count": null,
+      "denominator": null
+    },
+    {
+      "id": "E3",
+      "kind": "observación docente",
+      "claim": "Mayor dificultad al formular preguntas",
+      "detail": "Observada durante entrevistas entre compañeros; sin rúbrica ni frecuencias aportadas.",
+      "count": null,
+      "denominator": null
+    },
+    {
+      "id": "E4",
+      "kind": "observación docente",
+      "claim": "Dificultades al presentar a otra persona",
+      "detail": "Algunas dificultades al expresar el género; no se especificaron formas lingüísticas concretas.",
+      "count": null,
+      "denominator": null
+    }
+  ],
+  "actions": [
+    {
+      "purpose": "Fortalecer la producción oral y favorecer la seguridad para participar.",
+      "objective": "Preparar recursos lingüísticos para el intercambio oral.",
+      "activity": "Modelado de un diálogo breve y preparación cooperativa de vocabulario y preguntas; cada integrante aporta y ensaya una parte.",
+      "duration": "",
+      "expected": "Se espera que cada estudiante disponga de expresiones útiles para iniciar el intercambio.",
+      "instruments": "Lista de cotejo de recursos lingüísticos y diario docente; instrumentos por revisar.",
+      "comments": "Propuesta pendiente de revisión. No se ha ejecutado. Distribución temporal y autorizaciones por confirmar.",
+      "status": "planificada",
+      "evidence_ids": [
+        "E2",
+        "E3"
+      ]
+    },
+    {
+      "purpose": "Fortalecer la producción oral y favorecer la seguridad para participar.",
+      "objective": "Facilitar participación progresiva en un ambiente de apoyo.",
+      "activity": "Ensayo de juegos de roles en parejas, con tarjetas de apoyo, turnos equitativos y retroalimentación respetuosa. Sin exposición pública forzada al inicio.",
+      "duration": "",
+      "expected": "Se espera ampliar las oportunidades de hablar y favorecer la seguridad percibida.",
+      "instruments": "Registro de participación y breve autopercepción; no equivale a escala clínica ni instrumento validado.",
+      "comments": "Propuesta pendiente de revisión. No se ha ejecutado. Distribución temporal y autorizaciones por confirmar.",
+      "status": "planificada",
+      "evidence_ids": [
+        "E1",
+        "E2"
+      ]
+    },
+    {
+      "purpose": "Fortalecer la producción oral y favorecer la seguridad para participar.",
+      "objective": "Practicar preguntas y comunicación de información sobre otras personas.",
+      "activity": "Juego de roles de entrevista con una meta compartida; rotación de roles de entrevistador y entrevistado y presentación del personaje. Reducir apoyos según desempeño.",
+      "duration": "",
+      "expected": "Se espera que los estudiantes formulen preguntas y comuniquen información con apoyos gradualmente menores.",
+      "instruments": "Rúbrica oral por revisar y registro de ayudas utilizadas.",
+      "comments": "Propuesta pendiente de revisión. No se ha ejecutado. Distribución temporal y autorizaciones por confirmar.",
+      "status": "planificada",
+      "evidence_ids": [
+        "E3",
+        "E4"
+      ]
+    },
+    {
+      "purpose": "Fortalecer la producción oral y favorecer la seguridad para participar.",
+      "objective": "Reflexionar sobre el desempeño y ajustar el siguiente ciclo.",
+      "activity": "Tarea oral comparable con la inicial; reflexión individual y del equipo sobre comunicación y seguridad. Decidir ajustes con las evidencias recogidas.",
+      "duration": "",
+      "expected": "Se espera identificar avances, dificultades persistentes y ajustes; no se anticipan mejoras medidas.",
+      "instruments": "Criterios comparables al diagnóstico, autopercepción y diario de campo; límites de comparación por documentar.",
+      "comments": "Propuesta pendiente de revisión. No se ha ejecutado. Distribución temporal y autorizaciones por confirmar.",
+      "status": "planificada",
+      "evidence_ids": [
+        "E1",
+        "E2",
+        "E3",
+        "E4"
+      ]
+    }
+  ],
+  "sources": []
+}

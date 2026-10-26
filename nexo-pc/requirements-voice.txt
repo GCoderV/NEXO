@@ -1,0 +1,12 @@
+# Optional. Windows 10/11 x64, CPython 3.11–3.14. No cloud speech account.
+vosk==0.3.45
+sounddevice==0.5.3
+winrt-runtime==3.2.1; sys_platform == 'win32'
+winrt-Windows.Foundation==3.2.1; sys_platform == 'win32'
+winrt-Windows.Foundation.Collections==3.2.1; sys_platform == 'win32'
+winrt-Windows.Media==3.2.1; sys_platform == 'win32'
+winrt-Windows.Media.Core==3.2.1; sys_platform == 'win32'
+winrt-Windows.Media.SpeechSynthesis==3.2.1; sys_platform == 'win32'
+winrt-Windows.Media.Playback==3.2.1; sys_platform == 'win32'
+winrt-Windows.Storage==3.2.1; sys_platform == 'win32'
+winrt-Windows.Storage.Streams==3.2.1; sys_platform == 'win32'
