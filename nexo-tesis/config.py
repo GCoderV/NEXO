@@ -75,7 +75,9 @@ class Config:
     def account(self,provider,alias,key,remember=False,aid=None,enabled=True):
         from providers import PROVIDERS
         if provider not in PROVIDERS or provider=='Ollama':raise ValueError('Proveedor de cuenta inválido.')
-        if not isinstance(key,str) or not key.strip():raise ValueError('Configura una credencial antes de guardar la cuenta.')
+        if not isinstance(key,str) or not key.strip():
+            if provider=='Copilot365':raise ValueError('Copilot365 no usa API key. Falta la conexión a tu sesión de M365: en Cuentas pulsa «Conectar escritorio M365». No hay que escribir claves, tokens ni URLs.')
+            raise ValueError('Configura una credencial antes de guardar la cuenta.')
         if aid and self.data['accounts'].get(aid,{}).get('provider')!=provider:raise ValueError('La cuenta pertenece a otro proveedor.')
         aid=aid or uuid.uuid4().hex
         generation=uuid.uuid4().hex
@@ -100,7 +102,9 @@ class Config:
         from providers import API
         if provider!='Ollama':
             a=self.data['accounts'].get(aid,{})
-            if a.get('provider')!=provider:raise ValueError('Selecciona una cuenta configurada de este proveedor.')
+            if a.get('provider')!=provider:
+                if provider=='Copilot365':raise ValueError('Copilot365 necesita una conexión a tu sesión de Microsoft 365, no una API key. En Cuentas pulsa «Conectar escritorio M365» y vuelve aquí.')
+                raise ValueError('Selecciona una cuenta configurada de este proveedor.')
             key=self.secret(aid)
         else:key='';aid=''
         api=API(provider,key,model,endpoint)

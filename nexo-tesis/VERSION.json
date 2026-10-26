@@ -110,7 +110,7 @@
         }
       ]
     },
-    "local_continuity_tests": "305 unit tests passed, 2 skipped; synthetic fixtures only; Tk/Xvfb not run"
+    "local_continuity_tests": "314 unit tests passed, 2 skipped; synthetic fixtures only; Tk/Xvfb not run"
   },
   "fixes": [
     "Project file library, reading state, version/provenance and route-scoped excerpt grants",
@@ -121,7 +121,8 @@
     "Continuidad Copilot 0.4.1-dev: hilo durable por defecto, sin rotacion a los 40 turnos, recuperacion y revocacion con decision explicita, cabecera de afinidad aislada y contexto incremental solo tras verificacion",
     "Revocation also excludes tracked derived context from unauthorized routes",
     "Anteproyecto does not schedule final empirical results solely because diagnostic data are present",
-    "Unknown bibliography years no longer become literal None; peer-review reports filtered"
+    "Unknown bibliography years no longer become literal None; peer-review reports filtered",
+    "Copilot365 sin API key: el formulario de Cuentas oculta la clave, Guardar cuenta inicia Conectar escritorio M365 y Guardar y usar ofrece la conexion en lugar de pedir credenciales"
   ],
   "autonomy": {
     "opt_in_batch": true,
@@ -170,9 +171,17 @@
     "uncertain_result": "keeps identifiers and requires an explicit user decision; never silently re-sends or rebinds",
     "revocation": "requires an explicit clean-thread decision; sent material remains in Microsoft",
     "server_recall_verified": false,
-    "local_tests": "305 passed / 2 skipped; no authenticated Microsoft session"
+    "local_tests": "314 passed / 2 skipped; no authenticated Microsoft session",
+    "no_api_key": {
+      "api_key_field_hidden": true,
+      "save_account_starts_m365_connection": true,
+      "save_route_offers_m365_connection": true,
+      "user_never_types_tokens_or_urls": true,
+      "launch_and_capture_functions_unchanged": true,
+      "verified_with_real_tk_and_m365": false
+    }
   },
-  "release_status": "development build available at releases/nexo-tesis-v0.4.1-dev-windows.zip; NOT a published release; remote Copilot continuity unverified",
+  "release_status": "development build available at releases/nexo-tesis-v0.4.1-dev-windows.zip (rebuilt with Copilot365 no-API-key fix); NOT a published release; remote Copilot continuity unverified",
   "development_package": {
     "file": "releases/nexo-tesis-v0.4.1-dev-windows.zip",
     "prefix": "Nexo-Tesis-0.4.1-dev/",
@@ -180,7 +189,7 @@
     "files": 111,
     "runtime_only": true,
     "internal_sha256sums": true,
-    "tests_run_against_extracted_package": "305 passed / 2 skipped",
+    "tests_run_against_extracted_package": "314 passed / 2 skipped",
     "tk_interface_executed": false,
     "ready_to_use": {
       "quickstart": "LEER-PRIMERO.txt",

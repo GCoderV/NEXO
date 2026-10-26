@@ -89,6 +89,7 @@ def ollama_models(endpoint):
 class API:
     def __init__(self, provider, key, model, endpoint='http://127.0.0.1:11434', timeout=120):
         if provider not in PROVIDERS or (provider!='Ollama' and not key.strip()):
+            if provider=='Copilot365':raise ValueError('Copilot365 no usa API key: falta la conexión a tu sesión de Microsoft 365. En Cuentas pulsa «Conectar escritorio M365».')
             raise ValueError('Selecciona un proveedor e introduce su clave en Configuración. Ollama no necesita clave.')
         if provider=='Gemini' and isinstance(model,str) and model.startswith('models/'):model=model[7:]
         if not re.fullmatch(r'[A-Za-z0-9_./:-]{1,120}',model):raise ValueError('Identificador de modelo inválido.')

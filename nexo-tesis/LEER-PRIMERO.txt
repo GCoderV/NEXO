@@ -32,5 +32,23 @@ IMPORTANTE
 * Manten este paquete en un lugar privado: el codigo incluye el piloto academico
   con institucion y centro educativo.
 
+COPILOT365 NO NECESITA API KEY
+------------------------------
+Si al elegir Copilot parece que pide una API key o credenciales, NO falta
+ninguna clave: Copilot365 se conecta a TU sesion de Microsoft 365. Pasos:
+
+1. Abre "Modelos y cuentas" > pestana "Cuentas" > "Nueva cuenta".
+2. En Proveedor elige Copilot365. El campo "API key" desaparece.
+3. Escribe un nombre y pulsa "Conectar escritorio M365" (o el boton
+   "Conectar / guardar M365"). Autoriza y sigue el aviso: se copia una
+   frase de prueba; pegala TU en un CHAT NUEVO de Copilot, sin adjuntos.
+4. Cuando se guarde la conexion, vuelve a "Modelos y rutas" y pulsa
+   "Guardar y usar".
+
+No pegues contrasenas, tokens ni URLs autenticadas. Si no tienes la app de
+escritorio de Copilot, prueba el modo "Acceso con Edge" en esa pestana.
+Es experimental: requiere acceso real a Microsoft 365 Copilot. Si no quieres
+usarlo, elige cualquier otro proveedor (estos SI usan API key).
+
 Archivos: README.md (manual completo), CONTINUIDAD-COPILOT.md (cambios y prueba),
 VERSION.json, SHA256SUMS.txt (integridad) y LICENSE + licencias de pypdf/websocket.

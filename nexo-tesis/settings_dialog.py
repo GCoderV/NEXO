@@ -61,22 +61,43 @@ class SettingsDialog:
         account_provider.bind('<<ComboboxSelected>>',lambda e:self.new_account())
         ttk.Label(f,text='Nombre de cuenta').grid(row=1,column=0,sticky='w',pady=5);self.entry(f,self.alias).grid(row=1,column=1,sticky='ew')
         cb=ttk.Checkbutton(f,text='Cuenta habilitada',variable=self.account_enabled);cb.grid(row=2,column=2);self.widgets.append(cb)
-        ttk.Label(f,text='API key').grid(row=2,column=0,sticky='w');self.entry(f,self.secret,show='●').grid(row=2,column=1,sticky='ew')
-        cb=ttk.Checkbutton(f,text='Recordar con cifrado de Windows (DPAPI); desmarcado = solo sesión',variable=self.remember);cb.grid(row=3,column=0,columnspan=2,sticky='w',pady=8);self.widgets.append(cb)
+        self.api_label=ttk.Label(f,text='API key');self.api_label.grid(row=2,column=0,sticky='w')
+        self.api_entry=self.entry(f,self.secret,show='●');self.api_entry.grid(row=2,column=1,sticky='ew')
+        self.remember_cb=ttk.Checkbutton(f,text='Recordar con cifrado de Windows (DPAPI); desmarcado = solo sesión',variable=self.remember);self.remember_cb.grid(row=3,column=0,columnspan=2,sticky='w',pady=8);self.widgets.append(self.remember_cb)
         row=ttk.Frame(f);row.grid(row=4,column=0,columnspan=2,sticky='ew')
-        for text,fn in [('Nueva cuenta',self.new_account),('Guardar cuenta',self.save_account),('Eliminar cuenta',self.remove_account),('Conectar escritorio M365',self.connect_copilot)]:self.button(row,text,fn,style='Accent.TButton' if text=='Guardar y usar' else 'TButton').pack(side='left',padx=(0,5))
-        self.probe=tk.StringVar(value='Copilot365 no usa API key: selecciona ese proveedor y pulsa Conectar escritorio M365.')
+        for text,fn in [('Nueva cuenta',self.new_account),('Guardar cuenta',self.save_account),('Eliminar cuenta',self.remove_account),('Conectar escritorio M365',self.connect_copilot)]:
+            b=self.button(row,text,fn,style='Accent.TButton' if text=='Guardar y usar' else 'TButton');b.pack(side='left',padx=(0,5))
+            if text=='Guardar cuenta':self.save_account_button=b
+        self.probe=tk.StringVar(value='')
         ttk.Label(f,textvariable=self.probe,wraplength=710,style='Muted.TLabel').grid(row=5,column=0,columnspan=2,sticky='w',pady=8)
         ttk.Button(f,text='Copiar mensaje de conexión',command=self.copy_probe).grid(row=6,column=0,columnspan=2,sticky='w')
         self.account_tree=ttk.Treeview(f,columns=('provider','alias','storage','state'),show='headings',height=4,selectmode='browse')
         for col,title,width in [('provider','Proveedor',110),('alias','Cuenta',200),('storage','Credencial',130),('state','Estado',180)]:self.account_tree.heading(col,text=title);self.account_tree.column(col,width=width,minwidth=60)
         self.account_tree.grid(row=7,column=0,columnspan=2,sticky='nsew',pady=(10,0));self.account_tree.bind('<<TreeviewSelect>>',lambda e:self.load_account())
         ttk.Label(f,text='No se guardan claves en proyectos ni en registros. No se crean cuentas, activan pagos ni se recargan saldos. Microsoft y otros proveedores pueden aplicar sus propias condiciones y permisos.',wraplength=710,style='Muted.TLabel').grid(row=8,column=0,columnspan=2,sticky='w',pady=8)
+        self.sync_account_provider()
+    def sync_account_provider(self):
+        """Copilot365 is a session connector, not an API key: never ask for one.
+
+        The visible form must match the selected provider so choosing Copilot365
+        cannot look like a demand for a key, token or URL from the user.
+        """
+        copilot=self.ap.get()=='Copilot365'
+        if copilot:
+            self.api_label.grid_remove();self.api_entry.grid_remove();self.secret.set('')
+            self.remember_cb.configure(text='Recordar la conexión con cifrado de Windows (DPAPI); desmarcado = solo sesión')
+            self.save_account_button.configure(text='Conectar / guardar M365')
+            self.probe.set('Copilot365 NO usa API key: pulsa «Conectar escritorio M365» para vincular TU sesión de Microsoft 365. La cuenta se guarda sola. No pegues claves, tokens ni URLs.')
+        else:
+            self.api_label.grid(row=2,column=0,sticky='w');self.api_entry.grid(row=2,column=1,sticky='ew');self.api_entry.state(['!disabled'])
+            self.remember_cb.configure(text='Recordar con cifrado de Windows (DPAPI); desmarcado = solo sesión')
+            self.save_account_button.configure(text='Guardar cuenta')
+            self.probe.set('Escribe la API key de tu proveedor. Copilot365 no la necesita: elige ese proveedor y pulsa «Conectar escritorio M365».')
     def build_policy(self):
         f=self.policy_tab;f.columnconfigure(0,weight=1)
         self.automatic=tk.BooleanVar(value=self.config.data.get('automatic',True));self.limit=tk.IntVar(value=self.config.data.get('attempt_limit',6));self.seconds=tk.IntVar(value=self.config.data.get('cycle_seconds',180))
         cb=ttk.Checkbutton(f,text='Rotación automática entre rutas configuradas y marcadas',variable=self.automatic);cb.grid(row=0,column=0,sticky='w');self.widgets.append(cb)
-        ttk.Label(f,text='Orden: cuenta actual → otras cuentas del mismo modelo → otros modelos del proveedor → otros proveedores autorizados. Dentro de cada grupo se respeta el orden de las rutas. Ollama solo se elige manualmente y nunca salta a la nube.\n\nUna ruta sin clave, con cuenta eliminada/desactivada, o con cifrado que no se puede abrir recibe cero llamadas. Las claves de solo sesión también sirven.\n\nLa rotación puede consumir cuota o saldo de todas las rutas que marques. Verifica sus precios: un ID no garantiza acceso gratuito. Nexo no activa planes, compras ni recargas. La autorización de destinatarios es por proyecto.\n\nErrores ambiguos después de enviar o de formato académico se detienen para que decidas. No se promete facturación exactamente una vez. Las cuotas pueden estar compartidas entre modelos o cuentas.',wraplength=710,justify='left').grid(row=1,column=0,sticky='w',pady=16)
+        ttk.Label(f,text='Orden: cuenta actual → otras cuentas del mismo modelo → otros modelos del proveedor → otros proveedores autorizados. Dentro de cada grupo se respeta el orden de las rutas. Ollama solo se elige manualmente y nunca salta a la nube.\n\nUna ruta sin conexión (Copilot365) o sin clave (API), con cuenta eliminada/desactivada, o con cifrado que no se puede abrir recibe cero llamadas. Las claves de solo sesión también sirven.\n\nLa rotación puede consumir cuota o saldo de todas las rutas que marques. Verifica sus precios: un ID no garantiza acceso gratuito. Nexo no activa planes, compras ni recargas. La autorización de destinatarios es por proyecto.\n\nErrores ambiguos después de enviar o de formato académico se detienen para que decidas. No se promete facturación exactamente una vez. Las cuotas pueden estar compartidas entre modelos o cuentas.',wraplength=710,justify='left').grid(row=1,column=0,sticky='w',pady=16)
         row=ttk.Frame(f);row.grid(row=2,column=0,sticky='w')
         ttk.Label(row,text='Intentos por ciclo (1–30)').pack(side='left');e=ttk.Spinbox(row,from_=1,to=30,textvariable=self.limit,width=5);e.pack(side='left',padx=10);self.widgets.append(e)
         ttk.Label(row,text='Presupuesto en segundos (10–600)').pack(side='left');e=ttk.Spinbox(row,from_=10,to=600,textvariable=self.seconds,width=6);e.pack(side='left',padx=10);self.widgets.append(e)
@@ -121,13 +142,32 @@ class SettingsDialog:
         except ValueError:return
         self.provider.set(r['provider']);self.model.set(r['model']);self.endpoint.set(r.get('endpoint') or 'http://127.0.0.1:11434');self.auto.set(bool(r.get('auto')));self.refresh_accounts()
         self.account_choice.set(next((name for name,aid in self.account_map.items() if aid==r['account_id']),''));self.model_combo.configure(values=self.model_options())
+    def copilot_account_ready(self,aid):
+        """A Copilot account is usable only while its observed connection is readable."""
+        if not aid:return False
+        try:return bool((self.config.secret(aid) or '').strip())
+        except Exception:return False
+    def offer_copilot_connection(self):
+        """Do not ask for an API key: send the user to the one-time M365 connection."""
+        text=('Copilot365 no usa API key ni credenciales que tengas que escribir.\n\n'
+              'Nexo se conecta a TU sesión de Microsoft 365 Copilot: hay que pulsar '
+              '«Conectar escritorio M365» una vez y enviar la frase de prueba en un chat nuevo.\n\n'
+              '¿Abrir ahora esa conexión?')
+        if not messagebox.askyesno('Copilot365 · sin API key',text,parent=self.win):
+            self.note.set('Copilot365 necesita una conexión a tu sesión de M365. En Cuentas pulsa «Conectar escritorio M365»; no hay API key que introducir.');return None
+        self.tabs.select(self.accounts_tab);self.new_account();self.ap.set('Copilot365');self.sync_account_provider()
+        if not self.alias.get().strip():self.alias.set('Microsoft 365')
+        self.connect_copilot();return None
     def save_route(self):
         provider=self.provider.get();aid=self.account_map.get(self.account_choice.get(),'');model=self.model.get().strip();ep=self.endpoint.get().strip()
+        if provider=='Copilot365' and not self.copilot_account_ready(aid):return self.offer_copilot_connection()
         old=next((r for r in self.config.data['routes'] if r['provider']==provider and r['model']==model.removeprefix('models/') and r['account_id']==aid and (provider!='Ollama' or r['endpoint']==ep)),None)
         rid=self.config.route(provider,model,aid,ep,self.auto.get(),old['id'] if old else None)
         self.refresh();self.route_tree.selection_set(rid);self.load_route();self.note.set('Ruta guardada. Guardar y usar la selecciona para conversar.');return rid
     def use_route(self):
-        rid=self.save_route();self.config.select(rid);self.app.update_provider();self.note.set('En uso: '+self.provider.get()+' / '+self.account_choice.get()+' / '+self.model.get()+'. Puedes cerrar esta ventana y conversar en el mismo proyecto.')
+        rid=self.save_route()
+        if not rid:return
+        self.config.select(rid);self.app.update_provider();self.note.set('En uso: '+self.provider.get()+' / '+self.account_choice.get()+' / '+self.model.get()+'. Puedes cerrar esta ventana y conversar en el mismo proyecto.')
     def remove_route(self):
         r=self.selected_route()
         if not messagebox.askyesno('Quitar ruta','¿Quitar esta ruta? La cuenta y la conversación se conservan.',parent=self.win):return
@@ -141,10 +181,22 @@ class SettingsDialog:
         sel=self.account_tree.selection()
         if not sel:return
         self.account_id=sel[0];a=self.config.data['accounts'][self.account_id];self.ap.set(a['provider']);self.alias.set(a['alias']);self.remember.set(bool(a.get('secret')));self.secret.set('');self.account_enabled.set(a.get('enabled',True))
-        self.note.set('Deja la clave vacía para conservarla. Guardar también rehabilita una cuenta con acceso rechazado.')
-    def new_account(self):self.account_id=None;self.alias.set('');self.secret.set('');self.remember.set(False);self.account_enabled.set(True);self.account_tree.selection_remove(*self.account_tree.selection())
+        self.sync_account_provider()
+        self.note.set('Conexión de Copilot365 conservada. Si caducó, pulsa «Conectar escritorio M365» para renovarla; no hay API key.' if a['provider']=='Copilot365' else 'Deja la clave vacía para conservarla. Guardar también rehabilita una cuenta con acceso rechazado.')
+    def new_account(self):
+        self.account_id=None;self.alias.set('');self.secret.set('');self.remember.set(False);self.account_enabled.set(True);self.account_tree.selection_remove(*self.account_tree.selection())
+        self.sync_account_provider()
     def save_account(self):
-        if self.ap.get()=='Copilot365' and not self.account_id:raise ValueError('Usa Conectar escritorio M365; no pegues una API key.')
+        if self.ap.get()=='Copilot365':
+            # No key to paste. Reuse a readable connection or (re)start the M365 flow.
+            key=''
+            if self.account_id:
+                try:key=self.config.secret(self.account_id) or ''
+                except Exception:key=''
+            if not key.strip():self.connect_copilot();return
+            self.account_id=self.config.account('Copilot365',self.alias.get(),key.strip(),self.remember.get(),self.account_id,self.account_enabled.get())
+            self.secret.set('');self.focus_account(self.account_id)
+            self.note.set('Cuenta Copilot actualizada. No se introdujo ninguna API key. Pulsa Guardar y usar para conversar.');return
         key=self.secret.get().strip() or (self.config.secret(self.account_id) if self.account_id else '')
         self.account_id=self.config.account(self.ap.get(),self.alias.get(),key,self.remember.get(),self.account_id,self.account_enabled.get());self.secret.set('');self.focus_account(self.account_id);self.note.set('Cuenta disponible con modelo sugerido (no verificado). Elige otro modelo si corresponde y pulsa Guardar y usar. No se activó la rotación ni se hizo una consulta.')
     def remove_account(self):
@@ -173,6 +225,7 @@ class SettingsDialog:
             for w in self.widgets:
                 w.state(['!disabled'])
                 if isinstance(w,ttk.Combobox):w.configure(state='readonly' if getattr(w,'_readonly',False) else 'normal')
+            if self.ap.get()=='Copilot365':self.api_entry.state(['disabled'])  # keep the key field closed for Copilot
             if error:self.note.set(self.config.redact(error));return
             try:done(value)
             except Exception as e:self.note.set(self.config.redact(e))
@@ -195,11 +248,11 @@ class SettingsDialog:
         if not messagebox.askyesno('Conexión experimental a tu sesión',intro+' Nexo intentará abrirlo con diagnóstico SOLO local y observará su conexión sin recargar la ventana ni borrar sus datos. Inicia sesión tú mismo; no compartas tu contraseña ni tokens.\n\nDespués copia la frase de prueba y envíala manualmente en un chat nuevo, sin archivos adjuntos. No se automatiza escribir o leer el chat. Se capturará únicamente la conexión que transporte esa frase.\n\nAl caducar la sesión, Nexo podrá observar una renovación si Microsoft la produce en esa ventana y mantiene la misma cuenta. Si no ocurre, pedirá reconectar; no recargará la ventana. Cierra Copilot al terminar para cerrar su puerto de diagnóstico. ¿Autorizar?',parent=self.win):return
         self.probe_text='Responde solo OK. NEXO CONEXION '+uuid.uuid4().hex[:12];self.probe.set(self.probe_text);self.copy_probe()
         self.note.set('Frase copiada. Espera a que cargue Copilot normalmente, abre un chat NUEVO y envíala allí manualmente. Límite: 3 minutos.')
-        aid=self.account_id;alias=self.alias.get() or 'Microsoft 365';remember=self.remember.get();probe=self.probe_text
+        aid=self.account_id;alias=self.alias.get() or 'Microsoft 365';remember=self.remember.get();probe=self.probe_text;enabled=self.account_enabled.get()
         def work():return capture_connection(launch_desktop() if mode=='Escritorio M365' else launch_auth_window(self.app.store.root),probe=probe,stop=self.cancel,on_ready=lambda:self.progress.put('Observación preparada SIN recarga. Abre un chat NUEVO en Copilot y envía la frase copiada.'))
         def done(secret):
-            self.account_id=self.config.account('Copilot365',alias,secret,remember,aid);self.focus_account(self.account_id)
-            self.note.set('Conexión observada y guardada. Esto aún no confirma inferencia independiente. Copilot ya aparece en la lista. Pulsa Guardar y usar, cierra esta ventana y prueba una solicitud en Nexo.')
+            self.account_id=self.config.account('Copilot365',alias,secret,remember,aid,enabled);self.focus_account(self.account_id)
+            self.note.set('Conexión observada y guardada SIN API key. Esto aún no confirma inferencia independiente. Copilot ya aparece en la lista. Pulsa Guardar y usar, cierra esta ventana y prueba una solicitud en Nexo.')
         self.async_job(work,done)
     def close(self):
         self.cancel.set();self.secret.set('');self.app.update_provider()

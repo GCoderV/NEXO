@@ -62,6 +62,7 @@ En Fuentes → **Referencias Copilot**, se muestran los títulos, identificadore
 En **Modelos y cuentas → Cuentas**:
 
 - Elige proveedor, escribe un nombre para identificar la cuenta y su API key. Guarda la cuenta. Aparecerá en Modelos y rutas con un modelo sugerido y seleccionado en el editor; pulsa **Guardar y usar** para adoptarlo como ruta inicial, o elige otro ID primero.
+- **Excepción Copilot365: no es una API y no tiene API key.** Al seleccionarlo desaparece el campo «API key» y el botón pasa a **Conectar / guardar M365**. No hay que pegar claves, tokens ni URLs: pulsa **Conectar escritorio M365** (o ese botón) para vincular tu sesión de Microsoft 365. Si desde **Modelos y rutas** intentas guardar una ruta Copilot365 sin cuenta, Nexo te ofrece abrir esa conexión en lugar de pedir credenciales. Ver «Conectar desde Nexo».
 - Puedes registrar varias cuentas del mismo proveedor. Una cuenta se reutiliza en cuantos modelos de **ese proveedor** selecciones: no necesitas duplicar su clave por modelo.
 - **Recordar** guarda el secreto con Windows DPAPI, vinculado al usuario/equipo actuales. Desmarcado significa que Nexo conserva la credencial solo durante esta ejecución. En otros sistemas no hay sustituto en texto plano.
 - Deja la clave vacía al editar una cuenta para conservarla. Deshabilitar o eliminar una cuenta la excluye de las llamadas automáticas. Eliminarla deja sus rutas sin credencial.
@@ -113,9 +114,9 @@ El transporte de las solicitudes de Nexo es **WebSocket/SignalR directo**. No se
 
 ### Conectar desde Nexo
 
-1. En Cuentas, pulsa **Nueva cuenta**, elige **Copilot365** y asigna un nombre.
+1. En Cuentas, pulsa **Nueva cuenta**, elige **Copilot365** y asigna un nombre. **No busques un campo de API key: al elegir Copilot365 desaparece.** Si el programa parece pedirte una clave, es que elegiste otro proveedor o aún no has iniciado la conexión; no pegues contraseñas ni tokens.
 2. Mantén **Escritorio M365** como método inicial. Cierra primero Microsoft 365 Copilot.
-3. Pulsa **Conectar escritorio M365** y lee la autorización. Nexo intentará abrir la aplicación instalada con diagnóstico de bucle local. Comprueba que el puerto observado esté enlazado solo a `127.0.0.1`/`::1`. No instala la aplicación ni fuerza el cierre de procesos.
+3. Pulsa **Conectar escritorio M365** (equivalente al botón **Conectar / guardar M365**) y lee la autorización. Nexo intentará abrir la aplicación instalada con diagnóstico de bucle local. Comprueba que el puerto observado esté enlazado solo a `127.0.0.1`/`::1`. No instala la aplicación ni fuerza el cierre de procesos.
 4. Inicia sesión **tú mismo** en la ventana de Microsoft. Espera a que Nexo indique que la observación está preparada. La ventana no se recarga desde Nexo.
 5. Copia la frase **NEXO CONEXION…** con el botón correspondiente y envíala **manualmente** en un chat nuevo de Microsoft, **sin adjuntos**. Es una prueba de conexión, no la conversación académica. La espera está limitada a tres minutos.
 6. Nexo conserva únicamente la conexión que transporta esa frase y una plantilla depurada de su invocación. La frase, el texto anterior y sus adjuntos no se guardan en la plantilla. El token queda en memoria o DPAPI según tu elección.

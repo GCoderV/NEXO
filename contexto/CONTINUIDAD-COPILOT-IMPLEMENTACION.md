@@ -115,6 +115,56 @@ incremental y reanudación con contexto actualizado.
 `test_ui_v040.py` solo se actualizó y comprobó sintácticamente, no se ejecutó. Las
 pruebas nativas con dobles no equivalen a Word real.
 
+## Incidencia del usuario: «al elegir Copilot pide API o credenciales»
+
+Reportada al probar el paquete 0.4.1-dev en Windows. No era un fallo del transporte
+de Copilot ni una petición real de clave: era un defecto de la interfaz de
+configuración, que trataba a Copilot365 como si fuera un proveedor con API key.
+
+Causas concretas, todas en la configuración (no en `launch_desktop`,
+`launch_auth_window`, `capture_connection` ni `sanitize_frame`, que siguen sin
+modificarse):
+
+1. `settings_dialog.py` mostraba siempre la etiqueta y el campo «API key» en la
+   pestaña Cuentas, también con Copilot365 seleccionado. El aviso que aclaraba
+   que no se usa clave era pequeño y fácil de pasar por alto.
+2. «Guardar cuenta» con Copilot365 y sin cuenta lanzaba
+   `Usa Conectar escritorio M365; no pegues una API key.` En la práctica el botón
+   que parecía guardar no servía y el usuario interpretaba que faltaba una clave.
+3. «Guardar y usar» desde Modelos y rutas, sin cuenta Copilot365, devolvía
+   `Selecciona una cuenta configurada de este proveedor.` Desde la vista del
+   usuario era equivalente a «configura credenciales».
+4. Editar una cuenta Copilot365 cuya conexión de solo sesión había caducado
+   terminaba en `Configura una credencial antes de guardar la cuenta.`
+
+Corrección aplicada:
+
+- El formulario de Cuentas se adapta al proveedor: con Copilot365 se ocultan la
+  etiqueta y el campo «API key», el botón pasa a **Conectar / guardar M365** y el
+  aviso explica que se usa la sesión propia, sin pegar claves, tokens ni URLs.
+- «Guardar cuenta» con Copilot365 reutiliza una conexión legible o inicia
+  directamente **Conectar escritorio M365**. Nunca pide una clave escrita.
+- «Guardar ruta»/«Guardar y usar» sin conexión Copilot365 ofrece abrir esa
+  conexión, en vez de exigir una cuenta con credencial. Si se rechaza, no se
+  selecciona ninguna ruta y se explica el motivo.
+- Los mensajes de `config.account`, `config.route` y `providers.API` nombran la
+  conexión a M365 en lugar de hablar de claves o credenciales.
+- `connect_copilot` conserva ahora el estado «Cuenta habilitada» al guardar.
+
+No se añadió ninguna vía para introducir claves de Copilot. La app sigue sin
+almacenar contraseñas, tokens pegados por el usuario ni URLs autenticadas; la
+conexión se observa de la sesión que el propio usuario inicia. Se añadieron 9
+pruebas de regresión con un doble de Tk (este entorno no tiene Tk/Xvfb): el total
+local queda en **314 superadas / 2 omitidas**. No sustituyen la ejecución en Tk
+real de Windows ni una sesión autenticada de Microsoft.
+
+Pasos para el usuario, también en `LEER-PRIMERO.txt`: Modelos y cuentas →
+Cuentas → Nueva cuenta → Proveedor **Copilot365** → nombre → **Conectar
+escritorio M365** → autorizar y enviar la frase copiada en un chat nuevo →
+volver a Modelos y rutas → **Guardar y usar**. Si no hay app de escritorio de
+Copilot, probar el modo «Acceso con Edge». Si no se desea usar la sesión de M365,
+elegir un proveedor con API key.
+
 ## Lo que aún requiere la sesión del usuario
 
 Sigue vigente la «Prueba de aceptación real» del diagnóstico. En resumen, con un

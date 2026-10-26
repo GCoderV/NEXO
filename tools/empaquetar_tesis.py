@@ -32,7 +32,11 @@ Las librerías `websocket` y `pypdf` ya vienen incluidas: no hay que instalar na
   conservación de IDs ante errores/reanudaciones, identidad de cuenta estable
   (oid/tid), cabecera de afinidad aislada para A/B y mensajes incrementales
   solo después de que TÚ verifiques la continuidad.
-- Pruebas locales: 305 superadas / 2 omitidas con fixtures sintéticas.
+- Corregido: al elegir **Copilot365 ya no se pide API key**. El campo desaparece,
+  «Guardar cuenta» inicia la conexión a tu sesión de M365 y «Guardar y usar»
+  ofrece «Conectar escritorio M365» si aún no hay cuenta. Copilot365 no es una
+  API: usa TU sesión, sin pegar claves, tokens ni URLs. Ver LEER-PRIMERO.txt.
+- Pruebas locales: 314 superadas / 2 omitidas con fixtures sintéticas.
 - **NO verificado**: sesión real de Copilot, recuerdo del servidor, Word COM,
   DPAPI, PowerShell de Windows ni la interfaz Tk en este entorno.
 - La cabecera `X-RoutingParameter-SessionKey` es evidencia de terceros sin
