@@ -172,5 +172,15 @@
     "server_recall_verified": false,
     "local_tests": "305 passed / 2 skipped; no authenticated Microsoft session"
   },
-  "release_status": "development tree; no new Windows package built; remote continuity unverified"
+  "release_status": "development build available at releases/nexo-tesis-v0.4.1-dev-windows.zip; NOT a published release; remote Copilot continuity unverified",
+  "development_package": {
+    "file": "releases/nexo-tesis-v0.4.1-dev-windows.zip",
+    "prefix": "Nexo-Tesis-0.4.1-dev/",
+    "builder": "tools/empaquetar_tesis.py",
+    "files": 108,
+    "runtime_only": true,
+    "internal_sha256sums": true,
+    "tests_run_against_extracted_package": "305 passed / 2 skipped",
+    "tk_interface_executed": false
+  }
 }

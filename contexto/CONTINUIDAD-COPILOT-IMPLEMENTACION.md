@@ -5,9 +5,12 @@ y la investigación externa ya estaban terminados y **no se rehicieron**. Este d
 describe la corrección aplicada al código de `nexo-tesis/`, qué se pudo comprobar sin red
 y qué sigue requiringo la sesión real del usuario.
 
-**No es una nueva versión publicada ni una prueba autenticada con Microsoft.** No se
-construyó un paquete de release, no se ejecutó Word COM, DPAPI, PowerShell de Windows
-ni inferencia con una cuenta real. No se instaló ni ejecutó el proxy externo de referencia.
+**No es una nueva versión publicada ni una prueba autenticada con Microsoft.** Se
+generó un **paquete Windows de desarrollo** descargable
+(`releases/nexo-tesis-v0.4.1-dev-windows.zip`) para poder probar la corrección,
+pero no es una release publicada ni verificada. No se ejecutó Word COM, DPAPI,
+PowerShell de Windows ni inferencia con una cuenta real. No se instaló ni ejecutó
+el proxy externo de referencia.
 
 ## Cambios, causa por causa
 
@@ -50,13 +53,35 @@ Además, alineado con el diseño recomendado:
 `providers.py` **no se modificó**: el slot `remote` por cuenta ya llegaba a
 `copilot_socket.complete` a través de `RoutedAPI`, de modo que la cabecera y el
 contador de turnos pudieron añadirse sin tocar el enrutado de proveedores ni la
-autenticación. Tampoco se modificaron `nexo-pc/`, los ZIP de `releases/`, el skill REA
-ni `nexo-tesis/SHA256SUMS.txt` (manifiesto de la release 0.4.0 ya publicada).
+autenticación. Tampoco se modificaron `nexo-pc/`, los ZIP originales de `releases/`,
+el skill REA ni `nexo-tesis/SHA256SUMS.txt` (manifiesto de la release 0.4.0 ya
+publicada). A `releases/` solo se **añadió** el paquete de desarrollo nuevo.
 
 `nexo-tesis/SHA256SUMS.txt` describe el paquete **publicado 0.4.0** y se conserva como
-referencia histórica; no se regeneró porque no se construyó una release nueva. El
+referencia histórica; el paquete nuevo lleva su propio `SHA256SUMS.txt` interno. El
 `SHA256SUMS.txt` de la raíz se regeneró para el árbol de trabajo actual y
 `contexto/SHA256SUMS-RESPALDO-0.4.0.txt` conserva el manifiesto prístino del respaldo.
+
+## Paquete descargable de desarrollo
+
+`releases/nexo-tesis-v0.4.1-dev-windows.zip` (108 archivos, ~563 KiB, prefijo
+`Nexo-Tesis-0.4.1-dev/`; su SHA-256 se anota en el `README.md` de la raíz, ya que
+un ZIP no puede contener su propia huella). Se construye sin red con `python3 tools/empaquetar_tesis.py`,
+que toma la lista de archivos runtime del paquete 0.4.0 publicado y **no puede** incluir
+tests, caches, informes ni credenciales. Incluye únicamente el runtime (módulos Python,
+`websocket/`, `pypdf/`, perfiles, scripts PowerShell, lanzador `.cmd`, licencias),
+`README.md` con un aviso de desarrollo al inicio, `VERSION.json`,
+`CONTINUIDAD-COPILOT.md` y su `SHA256SUMS.txt` interno.
+
+Validación del paquete: hashes internos de 107 archivos comprobados, CRC del ZIP,
+sin patrones de credenciales, 96 módulos runtime compilan y las **305 pruebas (2
+omitidas) pasan ejecutadas contra el paquete extraído**, no solo contra el árbol de
+desarrollo. Sigue sin ejecutarse la interfaz Tk (no hay Xvfb en este entorno), Word
+real ni una sesión autenticada de Microsoft.
+
+Para usarlo: descomprimir en una carpeta vacía y ejecutar `INICIAR-TESIS.cmd`
+(Python 3.11+ con Tkinter). Probar primero con un proyecto sintético. Los ZIP
+originales 0.4.0 y 0.3.1 siguen en `releases/` sin modificaciones.
 
 ## Comprobación local realizada
 

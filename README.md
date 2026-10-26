@@ -18,6 +18,13 @@ Código y contexto para continuar el desarrollo en una sesión limpia.
 > [contexto/CONTINUIDAD-COPILOT-IMPLEMENTACION.md](contexto/CONTINUIDAD-COPILOT-IMPLEMENTACION.md).
 > El diagnóstico original se conserva sin rehacer en
 > [contexto/CONTINUIDAD-COPILOT-DIAGNOSTICO.md](contexto/CONTINUIDAD-COPILOT-DIAGNOSTICO.md).
+>
+> **Descarga (build de desarrollo, no release):**
+> [nexo-tesis-v0.4.1-dev-windows.zip](releases/nexo-tesis-v0.4.1-dev-windows.zip)
+> (576,314 bytes, 108 archivos). SHA-256: `06177c2d9c4c231a8be1617eed81f40d2feb5b7217103857abbaceabff2ef9d3`.
+> Runtime limpio para Windows; descomprimir y ejecutar `INICIAR-TESIS.cmd`.
+> Incluye aviso de estado y `CONTINUIDAD-COPILOT.md`. Los ZIP 0.4.0 y 0.3.1
+> originales siguen en `releases/` sin cambios.
 
 ## Estado de la copia
 

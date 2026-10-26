@@ -1,0 +1,100 @@
+"""Build a clean, downloadable Windows runtime ZIP for Nexo Tesis 0.4.1-dev.
+
+Offline, no installs. The runtime file list comes from the published 0.4.0 package
+so the new build cannot accidentally include tests, caches, reports or credentials.
+Run from anywhere:  python3 tools/empaquetar_tesis.py
+"""
+import hashlib
+import json
+import zipfile
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent.parent
+SRC = ROOT / 'nexo-tesis'
+BASE = ROOT / 'releases' / 'nexo-tesis-v0.4.0-windows.zip'
+OUT = ROOT / 'releases' / 'nexo-tesis-v0.4.1-dev-windows.zip'
+PREFIX = 'Nexo-Tesis-0.4.1-dev/'
+
+NOTICE = '''# Nexo Tesis 0.4.1-dev · build de DESARROLLO (leer antes de usar)
+
+**Esto no es una release publicada ni una versión validada con Microsoft.**
+Es el código de Nexo Tesis 0.4.0 con la corrección local de continuidad de
+Microsoft 365 Copilot aplicada. Se construyó sin red y sin instalar dependencias.
+
+- Corregido: hilo persistente por defecto, sin rotación a los 40 turnos,
+  conservación de IDs ante errores/reanudaciones, identidad de cuenta estable
+  (oid/tid), cabecera de afinidad aislada para A/B y mensajes incrementales
+  solo después de que TÚ verifiques la continuidad.
+- Pruebas locales: 305 superadas / 2 omitidas con fixtures sintéticas.
+- **NO verificado**: sesión real de Copilot, recuerdo del servidor, Word COM,
+  DPAPI, PowerShell de Windows ni la interfaz Tk en este entorno.
+- La cabecera `X-RoutingParameter-SessionKey` es evidencia de terceros sin
+  confirmar. Puedes activarla/desactivarla en «Hilo Copilot» para comparar.
+
+Para probar: descomprime en una carpeta vacía y ejecuta `INICIAR-TESIS.cmd`
+(Python 3.11+ con Tkinter). Usa un proyecto de prueba SIN datos personales y
+sigue la «Prueba de aceptación real» de `CONTINUIDAD-COPILOT.md`. No pegues
+tokens ni URLs autenticadas; Nexo guarda su configuración en `~/.nexo-tesis`.
+
+Mantén este paquete en un lugar privado: el código incluye el piloto académico
+con institución y centro educativo.
+
+---
+
+'''
+
+FORBIDDEN_PREFIXES = ('tests/', 'reports/', '__pycache__/', 'copilot-login/', 'models/')
+FORBIDDEN_NAMES = ('.gitignore', '.env', 'config.json', 'preferences.json',
+                   'projects.sqlite3', 'SHA256SUMS.txt')
+
+
+def runtime_paths():
+    with zipfile.ZipFile(BASE) as z:
+        entries = {n.split('/', 1)[1] for n in z.namelist() if not n.endswith('/')}
+    entries.discard('SHA256SUMS.txt')
+    for rel in entries:
+        assert not rel.startswith(FORBIDDEN_PREFIXES), rel
+        assert Path(rel).name not in FORBIDDEN_NAMES, rel
+        assert not rel.endswith(('.pyc', '.pyo', '.log', '.db')), rel
+        assert (SRC / rel).is_file(), 'Falta en el código actual: ' + rel
+    return sorted(entries)
+
+
+def build():
+    entries = {}
+    for rel in runtime_paths():
+        data = (SRC / rel).read_bytes()
+        if rel == 'README.md':
+            data = NOTICE.encode('utf-8') + data
+        entries[rel] = data
+    # Metadata and the implementation report travel with the runtime build.
+    entries['VERSION.json'] = (SRC / 'VERSION.json').read_bytes()
+    entries['CONTINUIDAD-COPILOT.md'] = (
+        ROOT / 'contexto' / 'CONTINUIDAD-COPILOT-IMPLEMENTACION.md').read_bytes()
+    manifest = ''.join(
+        hashlib.sha256(entries[rel]).hexdigest() + '  ' + rel + '\n'
+        for rel in sorted(entries))
+    entries['SHA256SUMS.txt'] = manifest.encode('utf-8')
+
+    with zipfile.ZipFile(OUT, 'w', zipfile.ZIP_DEFLATED, compresslevel=9) as z:
+        for rel in sorted(entries):
+            z.writestr(PREFIX + rel, entries[rel])
+
+    with zipfile.ZipFile(OUT) as z:
+        assert z.testzip() is None
+        for rel, data in entries.items():
+            assert z.read(PREFIX + rel) == data, rel
+    report = {
+        'file': str(OUT), 'prefix': PREFIX.rstrip('/'),
+        'files': len(entries), 'bytes': OUT.stat().st_size,
+        'sha256': hashlib.sha256(OUT.read_bytes()).hexdigest(),
+        'source_equality_checked': True, 'crc_checked': True,
+        'runtime_only': True, 'network_used': False,
+        'status': 'development build; NOT a verified release; remote Copilot continuity untested',
+    }
+    print(json.dumps(report, ensure_ascii=False, indent=2))
+    return report
+
+
+if __name__ == '__main__':
+    build()
