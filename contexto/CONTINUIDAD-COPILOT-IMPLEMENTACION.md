@@ -165,6 +165,53 @@ volver a Modelos y rutas → **Guardar y usar**. Si no hay app de escritorio de
 Copilot, probar el modo «Acceso con Edge». Si no se desea usar la sesión de M365,
 elegir un proveedor con API key.
 
+## Incidencia del usuario: «La respuesta no cumple el formato académico»
+
+Durante una sesión autónoma real se guardaron 4 de 6 apartados y el conjunto se
+detuvo en el quinto. El registro decía: *«La respuesta no cumple el formato
+académico. No se aplicó. Puedes elegir otro modelo y pulsar Reanudar.»* Word
+no se modificó. Comportamiento de seguridad correcto —no se aplicó nada—, pero
+la causa era un falso negativo del analizador, no una respuesta inventada.
+
+`agent.unpack` exigía que **toda** la respuesta fuera JSON, y solo quitaba una
+cerca ``` si estaba al principio y al final exactos. Los modelos de chat
+(Copilot365) suelen responder «Claro, aquí tienes…», un bloque ```json y una
+nota final; también omiten `reply` o `sources` y a veces dejan comas finales.
+Además, `prompt_policy.DRAFT` pedía `{"text": ...}` mientras que
+`INCREMENTAL_TASK` pedía `drafts`, lo que confundía al modelo cuando el hilo
+de Copilot estaba en modo incremental (mensajes cortos tras marcar la
+continuidad como verificada).
+
+Corrección, sin cambiar el principio de «una sola respuesta, sin llamada de
+reparación»:
+
+- `parse_json` busca un único objeto JSON **completo** dentro de la respuesta,
+  respetando llaves dentro de cadenas y comas finales. Si no hay objeto válido,
+  se rechaza igual que antes. No se inventa contenido ni se vuelve a llamar al
+  modelo.
+- En tareas automáticas se normalizan las dos formas válidas (`text` y
+  `drafts`), se completan `section`, `sources` y `reply` cuando faltan y se
+  descartan `facts`/`topic` (una tarea automática nunca es una declaración del
+  usuario). Siguen rechazándose claves desconocidas, apartados inexistentes y
+  textos vacíos.
+- El aviso de error incluye ahora un **motivo fijo y seguro**: «no se encontró
+  un JSON completo», «el borrador propuesto no cumple el contrato», etc.
+  Nunca se vuelca la respuesta del modelo al registro (podría contener datos).
+- `DRAFT` e `INCREMENTAL_TASK` usan el mismo contrato JSON explícito.
+
+Se añadieron 17 pruebas de regresión (envoltorios de texto, cercas, comas,
+llaves dentro de cadenas, rechazo de prosa, clave desconocida, borrador
+inválido, prueba de extremo a extremo de una sesión autónoma y privacidad del
+motivo). Total local: **331 superadas / 2 omitidas**. La respuesta real que
+provocó el incidente no se guarda en el proyecto por diseño, así que no se
+puede reproducir literalmente: las pruebas usan fixtures sintéticas.
+
+Para el usuario, sin perder lo avanzado: elegir otra ruta/modelo (opcional) y
+pulsar **Reanudar**; solo se repite el apartado pendiente. Si el motivo dice
+«no se encontró un JSON completo», cambiar de modelo. Si activó los mensajes
+incrementales, «Conservar el hilo y reenviar contexto completo» en «Hilo
+Copilot» restaura el contrato completo. Todo esto está en `LEER-PRIMERO.txt`.
+
 ## Lo que aún requiere la sesión del usuario
 
 Sigue vigente la «Prueba de aceptación real» del diagnóstico. En resumen, con un

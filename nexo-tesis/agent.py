@@ -17,16 +17,100 @@ SYSTEM=instructions()
 
 class Stopped(RuntimeError):pass
 
+def _json_objects(text):
+    """Complete {...} candidates, left to right, ignoring braces inside strings.
+
+    Chat-oriented models (notably Copilot365) often wrap the requested JSON in
+    prose or in a ```json fence. This only locates an object that was actually
+    received: it never invents content and never triggers another model call.
+    """
+    found=[];start=None;depth=0;quoted=False;escape=False
+    for i,ch in enumerate(text):
+        if start is None:
+            if ch=='{':start=i;depth=1;quoted=False;escape=False
+        elif quoted:
+            if escape:escape=False
+            elif ch=='\\':escape=True
+            elif ch=='"':quoted=False
+        elif ch=='"':quoted=True
+        elif ch=='{':depth+=1
+        elif ch=='}':
+            depth-=1
+            if depth==0:found.append(text[start:i+1]);start=None
+    return found
+
+def _without_trailing_commas(text):
+    """Remove commas before } or ] only outside JSON strings."""
+    out=[];i=0;quoted=False;escape=False
+    while i<len(text):
+        ch=text[i]
+        if quoted:
+            out.append(ch)
+            if escape:escape=False
+            elif ch=='\\':escape=True
+            elif ch=='"':quoted=False
+            i+=1;continue
+        if ch=='"':quoted=True;out.append(ch);i+=1;continue
+        if ch==',':
+            j=i+1
+            while j<len(text) and text[j].isspace():j+=1
+            if j<len(text) and text[j] in '}]':i+=1;continue
+        out.append(ch);i+=1
+    return ''.join(out)
+
+def parse_json(text):
+    """Parse one JSON object, also when fenced or surrounded by brief prose."""
+    known={'reply','text','drafts','questions','question','search','topic','facts'}
+    try:
+        value=json.loads(text.strip())
+        if isinstance(value,dict):return value
+    except (ValueError,TypeError):pass
+    for candidate in _json_objects(text):
+        for attempt in (candidate,_without_trailing_commas(candidate)):
+            try:value=json.loads(attempt)
+            except (ValueError,TypeError):continue
+            if isinstance(value,dict) and set(value)&known:return value
+    raise ValueError('No se encontró un objeto JSON completo en la respuesta.')
+
+FORMAT_REASONS={
+ 'Respuesta del modelo vacía o demasiado larga.':'la respuesta llegó vacía o demasiado larga',
+ 'No se encontró un objeto JSON completo en la respuesta.':'no se encontró un JSON completo (es posible que el modelo haya respondido en texto libre)',
+ 'Respuesta de tarea incompatible.':'la respuesta de tarea incluía campos no permitidos',
+ 'Respuesta estructurada no compatible.':'faltan campos obligatorios o hay campos desconocidos',
+ 'Falta explicación utilizable.':'falta el campo reply',
+ 'Propuesta de dato inválida.':'un dato propuesto no es válido',
+ 'Propuesta de apartado inválida.':'el borrador propuesto no cumple el contrato',
+ 'Bloque de preguntas inválido.':'el bloque de preguntas no es válido',
+ 'Pregunta inválida.':'una pregunta no es válida',
+ 'Tema propuesto inválido.':'el tema propuesto no es válido',
+ 'Búsqueda inválida.':'la búsqueda propuesta no es válida',
+}
+def format_reason(error):
+    """Fixed, privacy-safe reason: never echoes model output, tokens or URLs."""
+    if isinstance(error,(TypeError,KeyError)):return 'la estructura JSON de la respuesta no es compatible'
+    return FORMAT_REASONS.get(str(error),'la respuesta no tiene el formato JSON académico esperado')
+
 def unpack(text,task=None):
     if not isinstance(text,str) or len(text)>45000:raise ValueError('Respuesta del modelo vacía o demasiado larga.')
-    text=text.strip()
-    if text.startswith('```'):
-        lines=text.splitlines()
-        if lines[-1].strip()=='```':text='\n'.join(lines[1:-1])
-    result=json.loads(text)
-    if task and isinstance(result,dict) and 'text' in result:
-        if set(result)-{'text','sources','reply','questions','search'}:raise ValueError('Respuesta de tarea incompatible.')
-        result={'reply':result.get('reply','Borrador preparado.'),'drafts':[{'section':task['section'],'text':result['text'],'sources':result.get('sources',[])}],'questions':result.get('questions',[]),'search':result.get('search')}
+    result=parse_json(text)
+    if task and isinstance(result,dict) and ('text' in result or 'drafts' in result):
+        # facts/topic are discarded here (an automatic task is never a user statement);
+        # accepting their presence avoids a false format error from chatty models.
+        allowed={'text','sources','reply','questions','question','search','drafts','facts','topic'}
+        if set(result)-allowed:raise ValueError('Respuesta de tarea incompatible.')
+        incoming=result.get('drafts',[]);drafts=[]
+        if isinstance(incoming,list):
+            for d in incoming[:2]:
+                if not isinstance(d,dict):continue
+                d=dict(d);d.setdefault('section',task['section'])
+                if not isinstance(d.get('sources'),list):d['sources']=[]
+                drafts.append(d)
+        if isinstance(result.get('text'),str):
+            sources=result.get('sources',[])
+            drafts.append({'section':task['section'],'text':result['text'],'sources':sources if isinstance(sources,list) else []})
+        reply=result.get('reply')
+        if not isinstance(reply,str) or not 1<=len(reply)<=10000:reply='Borrador preparado.'
+        result={'reply':reply,'drafts':drafts[:2],'questions':result.get('questions',[]),'question':result.get('question'),'search':result.get('search')}
     if not isinstance(result,dict) or set(result)-{'reply','facts','drafts','question','questions','search','topic'}:raise ValueError('Respuesta estructurada no compatible.')
     if not isinstance(result.get('reply'),str) or not 1<=len(result['reply'])<=10000:raise ValueError('Falta explicación utilizable.')
     for name,maximum in [('facts',12),('drafts',2)]:
@@ -193,8 +277,10 @@ class Agent:
                 if calls:raise ValueError('El modelo intentó herramientas no disponibles. No se ejecutaron.')
                 raw=redact(raw)
                 try:r=unpack(raw,op.get('task'))
-                except (ValueError,TypeError,KeyError):
-                    op['inflight']=False;p['run']={'status':'error_formato'};message(p,'system','La respuesta no cumple el formato académico. No se aplicó. Puedes elegir otro modelo y pulsar Reanudar.');checkpoint('format-pending');return p
+                except (ValueError,TypeError,KeyError) as e:
+                    op['inflight']=False;p['run']={'status':'error_formato'}
+                    message(p,'system','La respuesta no cumple el formato académico ('+format_reason(e)+'). No se aplicó. Puedes elegir otro modelo y pulsar Reanudar.')
+                    checkpoint('format-pending');return p
                 # Apply only a complete validated response while this operation is active.
                 before_drafts=dict(p['drafts'])
                 target=op.get('task',{}).get('section')

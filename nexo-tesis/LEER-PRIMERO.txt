@@ -50,5 +50,25 @@ escritorio de Copilot, prueba el modo "Acceso con Edge" en esa pestana.
 Es experimental: requiere acceso real a Microsoft 365 Copilot. Si no quieres
 usarlo, elige cualquier otro proveedor (estos SI usan API key).
 
+SI APARECE "LA RESPUESTA NO CUMPLE EL FORMATO ACADEMICO"
+--------------------------------------------------------
+No se perdio nada: los apartados ya guardados siguen ahi y Word NO se toco.
+El modelo respondio con texto libre en vez del JSON que Nexo necesita.
+Esta version acepta el JSON aunque venga dentro de texto o de un bloque de
+codigo json (tipico de Copilot365) y muestra el MOTIVO exacto del rechazo.
+
+Para continuar SIN reiniciar el conjunto:
+1. (Opcional) Abre "Modelos y cuentas" y elige otro modelo/ruta.
+2. Pulsa "Reanudar". Solo se repite el apartado pendiente; NO se repiten
+   los ya guardados, las busquedas ni las operaciones de Word.
+3. Si vuelve a fallar, lee el motivo en el REGISTRO del chat:
+   - "no se encontro un JSON completo": el modelo respondio en prosa.
+     Cambia de modelo o de ruta.
+   - "el borrador propuesto no cumple el contrato": falto el texto del
+     apartado. Prueba otra ruta o revisa si faltan datos en Memoria.
+4. Si activaste los mensajes incrementales en "Hilo Copilot", puedes
+   volver a "Conservar el hilo y reenviar contexto completo": el
+   recordatorio corto a veces hace que el modelo olvide el formato.
+
 Archivos: README.md (manual completo), CONTINUIDAD-COPILOT.md (cambios y prueba),
 VERSION.json, SHA256SUMS.txt (integridad) y LICENSE + licencias de pypdf/websocket.

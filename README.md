@@ -21,9 +21,10 @@ Código y contexto para continuar el desarrollo en una sesión limpia.
 >
 > **Descarga (build de desarrollo, no release):**
 > [nexo-tesis-v0.4.1-dev-windows.zip](releases/nexo-tesis-v0.4.1-dev-windows.zip)
-> (583,791 bytes, 111 archivos). SHA-256: `70843b4d7bf4682b3c3edb0c66b18071e58ae6d388da8e2f262661c666c2a485`.
-> Reconstruido para que **elegir Copilot365 no pida API key**: el campo desaparece
-> y el guardado ofrece «Conectar escritorio M365». Ver `LEER-PRIMERO.txt`.
+> (587,402 bytes, 111 archivos). SHA-256: `c3a1220fb8ac5fad39202542f0574ccf5fd42b4b14d697a6851c172cf5beea90`.
+> Reconstruido para que **elegir Copilot365 no pida API key** y para que un JSON
+> válido envuelto en texto no provoque «La respuesta no cumple el formato
+> académico». Ver `LEER-PRIMERO.txt`.
 > **Listo para usar:** descomprimir en una carpeta vacía y hacer doble clic en
 > `INICIAR-TESIS.cmd` (se autoverifica y abre la app). Requiere Python 3.11+ con
 > Tkinter; no instala nada. Incluye `LEER-PRIMERO.txt`, `VERIFICAR.cmd`, aviso de

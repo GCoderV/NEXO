@@ -36,7 +36,12 @@ Las librerías `websocket` y `pypdf` ya vienen incluidas: no hay que instalar na
   «Guardar cuenta» inicia la conexión a tu sesión de M365 y «Guardar y usar»
   ofrece «Conectar escritorio M365» si aún no hay cuenta. Copilot365 no es una
   API: usa TU sesión, sin pegar claves, tokens ni URLs. Ver LEER-PRIMERO.txt.
-- Pruebas locales: 314 superadas / 2 omitidas con fixtures sintéticas.
+- Corregido: «La respuesta no cumple el formato académico» ya no se produce
+  cuando un modelo de chat (Copilot365) envuelve un JSON válido en texto o en
+  un bloque ```json. Se valida un único objeto completo, sin llamada de
+  reparación; el aviso indica ahora el motivo exacto sin mostrar la respuesta.
+  Las instrucciones de tarea y de hilo incremental comparten el mismo contrato.
+- Pruebas locales: 331 superadas / 2 omitidas con fixtures sintéticas.
 - **NO verificado**: sesión real de Copilot, recuerdo del servidor, Word COM,
   DPAPI, PowerShell de Windows ni la interfaz Tk en este entorno.
 - La cabecera `X-RoutingParameter-SessionKey` es evidencia de terceros sin
