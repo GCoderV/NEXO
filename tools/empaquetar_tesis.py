@@ -15,11 +15,18 @@ BASE = ROOT / 'releases' / 'nexo-tesis-v0.4.0-windows.zip'
 OUT = ROOT / 'releases' / 'nexo-tesis-v0.4.1-dev-windows.zip'
 PREFIX = 'Nexo-Tesis-0.4.1-dev/'
 
-NOTICE = '''# Nexo Tesis 0.4.1-dev · build de DESARROLLO (leer antes de usar)
+NOTICE = '''# Nexo Tesis 0.4.1-dev · build de DESARROLLO, listo para usar
 
 **Esto no es una release publicada ni una versión validada con Microsoft.**
 Es el código de Nexo Tesis 0.4.0 con la corrección local de continuidad de
 Microsoft 365 Copilot aplicada. Se construyó sin red y sin instalar dependencias.
+
+**Inicio rápido:** descomprime TODO el ZIP en una carpeta vacía y haz doble clic
+en `INICIAR-TESIS.cmd`. El lanzador busca Python, comprueba la integridad del
+paquete y abre la app. Requisito único: Python 3.11+ con Tkinter y SQLite (el
+instalador de python.org ya los incluye). No se instala ni modifica nada.
+`VERIFICAR.cmd` hace solo la comprobación; `LEER-PRIMERO.txt` resume estos pasos.
+Las librerías `websocket` y `pypdf` ya vienen incluidas: no hay que instalar nada.
 
 - Corregido: hilo persistente por defecto, sin rotación a los 40 turnos,
   conservación de IDs ante errores/reanudaciones, identidad de cuenta estable
@@ -46,12 +53,15 @@ con institución y centro educativo.
 FORBIDDEN_PREFIXES = ('tests/', 'reports/', '__pycache__/', 'copilot-login/', 'models/')
 FORBIDDEN_NAMES = ('.gitignore', '.env', 'config.json', 'preferences.json',
                    'projects.sqlite3', 'SHA256SUMS.txt')
+# Conveniencias de "listo para usar" añadidas en 0.4.1-dev.
+READY_EXTRAS = ('LEER-PRIMERO.txt', 'VERIFICAR.cmd', 'verificar_instalacion.py')
 
 
 def runtime_paths():
     with zipfile.ZipFile(BASE) as z:
         entries = {n.split('/', 1)[1] for n in z.namelist() if not n.endswith('/')}
     entries.discard('SHA256SUMS.txt')
+    entries.update(READY_EXTRAS)
     for rel in entries:
         assert not rel.startswith(FORBIDDEN_PREFIXES), rel
         assert Path(rel).name not in FORBIDDEN_NAMES, rel

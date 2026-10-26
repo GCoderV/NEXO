@@ -177,10 +177,19 @@
     "file": "releases/nexo-tesis-v0.4.1-dev-windows.zip",
     "prefix": "Nexo-Tesis-0.4.1-dev/",
     "builder": "tools/empaquetar_tesis.py",
-    "files": 108,
+    "files": 111,
     "runtime_only": true,
     "internal_sha256sums": true,
     "tests_run_against_extracted_package": "305 passed / 2 skipped",
-    "tk_interface_executed": false
+    "tk_interface_executed": false,
+    "ready_to_use": {
+      "quickstart": "LEER-PRIMERO.txt",
+      "launcher": "INICIAR-TESIS.cmd",
+      "standalone_check": "VERIFICAR.cmd / verificar_instalacion.py",
+      "self_check_before_launch": true,
+      "external_requirement": "Python >=3.11 with Tkinter and SQLite; package installs nothing",
+      "bundled_dependencies": "websocket-client and pypdf vendored in the package"
+    },
+    "self_check_branches_tested": "failure (Tk missing on Linux) and success (Tk simulated)"
   }
 }

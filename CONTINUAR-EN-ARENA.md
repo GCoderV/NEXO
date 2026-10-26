@@ -13,7 +13,7 @@
 - **rea-setup/**: restauración de REA 6.7.0 y Node con package-lock. `restore.sh` instala dependencias: revisar el plan y obtener aprobación antes de ejecutarlo.
 - **releases/**: ZIP original Nexo PC 0.6.0 (actualización), ZIP Nexo Tesis 0.4.0, y 0.3.1 de Tesis para comparación/regresiones. No incluirlos en otro instalador por defecto.
 
-No hay una **versión publicada** nueva: el árbol de desarrollo de `nexo-tesis/` incorpora la corrección local (0.4.1-dev) descrita en `contexto/CONTINUIDAD-COPILOT-IMPLEMENTACION.md`. Sí hay un paquete Windows **de desarrollo** descargable en `releases/nexo-tesis-v0.4.1-dev-windows.zip`, construido sin red y validado con las pruebas locales; no es una release ni está verificado con Microsoft. Los ZIP originales 0.4.0/0.3.1 siguen intactos. El análisis original, que no se repite aquí, está en `contexto/CONTINUIDAD-COPILOT-DIAGNOSTICO.md`.
+No hay una **versión publicada** nueva: el árbol de desarrollo de `nexo-tesis/` incorpora la corrección local (0.4.1-dev) descrita en `contexto/CONTINUIDAD-COPILOT-IMPLEMENTACION.md`. Sí hay un paquete Windows **de desarrollo**, listo para usar, en `releases/nexo-tesis-v0.4.1-dev-windows.zip`: se descomprime y se abre con doble clic en `INICIAR-TESIS.cmd`, que se autoverifica antes de arrancar. Fue construido sin red y validado con las pruebas locales; no es una release ni está verificado con Microsoft. Requiere Python 3.11+ con Tkinter en el equipo; no instala nada. Los ZIP originales 0.4.0/0.3.1 siguen intactos. El análisis original, que no se repite aquí, está en `contexto/CONTINUIDAD-COPILOT-DIAGNOSTICO.md`.
 
 ## Pendiente prioritario: Copilot
 

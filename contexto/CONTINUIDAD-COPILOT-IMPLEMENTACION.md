@@ -47,8 +47,11 @@ Además, alineado con el diseño recomendado:
 
 `copilot_socket.py`, `conversation_state.py`, `context_policy.py`, `prompt_policy.py`,
 `agent.py`, `config.py`, `routing.py`, `materials.py`, `material_dialog.py`, `app.py`,
-`VERSION.json`, `tests/test_v040.py` (4 pruebas actualizadas), `test_ui_v040.py`
-(guion Tk actualizado) y `tests/test_continuidad_v041.py` (29 pruebas nuevas).
+`VERSION.json`, `INICIAR-TESIS.cmd`, `LEER-PRIMERO.txt`, `VERIFICAR.cmd`,
+`verificar_instalacion.py`, `tests/test_v040.py` (4 pruebas actualizadas),
+`test_ui_v040.py` (guion Tk actualizado) y `tests/test_continuidad_v041.py`
+(29 pruebas nuevas). Fuera de `nexo-tesis/`: `tools/empaquetar_tesis.py` y las
+notas de entrega (`README.md`, `CONTINUAR-EN-ARENA.md`, `AGENTS.md`).
 
 `providers.py` **no se modificó**: el slot `remote` por cuenta ya llegaba a
 `copilot_socket.complete` a través de `RoutedAPI`, de modo que la cabecera y el
@@ -64,24 +67,34 @@ referencia histórica; el paquete nuevo lleva su propio `SHA256SUMS.txt` interno
 
 ## Paquete descargable de desarrollo
 
-`releases/nexo-tesis-v0.4.1-dev-windows.zip` (108 archivos, ~563 KiB, prefijo
-`Nexo-Tesis-0.4.1-dev/`; su SHA-256 se anota en el `README.md` de la raíz, ya que
-un ZIP no puede contener su propia huella). Se construye sin red con `python3 tools/empaquetar_tesis.py`,
+`releases/nexo-tesis-v0.4.1-dev-windows.zip` (111 archivos, prefijo
+`Nexo-Tesis-0.4.1-dev/`; su tamaño y SHA-256 exactos se anotan en el `README.md`
+de la raíz, ya que un ZIP no puede contener su propia huella). Se construye sin red con `python3 tools/empaquetar_tesis.py`,
 que toma la lista de archivos runtime del paquete 0.4.0 publicado y **no puede** incluir
 tests, caches, informes ni credenciales. Incluye únicamente el runtime (módulos Python,
-`websocket/`, `pypdf/`, perfiles, scripts PowerShell, lanzador `.cmd`, licencias),
+`websocket/`, `pypdf/`, perfiles, scripts PowerShell, lanzadores `.cmd`, licencias),
 `README.md` con un aviso de desarrollo al inicio, `VERSION.json`,
 `CONTINUIDAD-COPILOT.md` y su `SHA256SUMS.txt` interno.
 
-Validación del paquete: hashes internos de 107 archivos comprobados, CRC del ZIP,
-sin patrones de credenciales, 96 módulos runtime compilan y las **305 pruebas (2
-omitidas) pasan ejecutadas contra el paquete extraído**, no solo contra el árbol de
-desarrollo. Sigue sin ejecutarse la interfaz Tk (no hay Xvfb en este entorno), Word
-real ni una sesión autenticada de Microsoft.
+**Listo para usar:** `LEER-PRIMERO.txt` (inicio rápido en texto plano con CRLF),
+`INICIAR-TESIS.cmd` (busca `.venv`, `py -3` o `python`; ejecuta el autochequeo y
+solo entonces abre `app.py`) y `VERIFICAR.cmd` / `verificar_instalacion.py` (comprueba
+sin red los hashes, los 20 módulos básicos, los 4 de interfaz, Tk y SQLite). El único
+requisito externo es Python 3.11+ con Tkinter y SQLite: el paquete no instala ni
+modifica nada, y `websocket`/`pypdf` ya van incluidos. No se puede empaquetar un
+intérprete de Windows desde este entorno Linux; quien no tenga Python debe instalarlo
+desde python.org.
 
-Para usarlo: descomprimir en una carpeta vacía y ejecutar `INICIAR-TESIS.cmd`
-(Python 3.11+ con Tkinter). Probar primero con un proyecto sintético. Los ZIP
-originales 0.4.0 y 0.3.1 siguen en `releases/` sin modificaciones.
+Validación del paquete: hashes internos de 110 archivos comprobados, CRC del ZIP,
+sin patrones de credenciales, 97 módulos runtime compilan, **ambas ramas del
+autochequeo** ejercitadas (fallo por Tk ausente en Linux y éxito con Tk simulado),
+y las **305 pruebas (2 omitidas) pasan ejecutadas contra el paquete extraído**, no
+solo contra el árbol de desarrollo. Sigue sin ejecutarse la interfaz Tk real (no hay
+Xvfb en este entorno), Word real ni una sesión autenticada de Microsoft.
+
+Para usarlo: descomprimir en una carpeta vacía y hacer doble clic en
+`INICIAR-TESIS.cmd`. Probar primero con un proyecto sintético. Los ZIP originales
+0.4.0 y 0.3.1 siguen en `releases/` sin modificaciones.
 
 ## Comprobación local realizada
 

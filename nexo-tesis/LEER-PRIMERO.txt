@@ -1,0 +1,36 @@
+﻿NEXO TESIS 0.4.1-dev - LISTO PARA USAR
+======================================
+
+INICIO RAPIDO (3 pasos)
+-----------------------
+1. Descomprime TODO el contenido de este ZIP en una carpeta vacia, por ejemplo
+   C:\Nexo Tesis . No ejecutes el .cmd desde dentro del ZIP.
+2. Haz doble clic en INICIAR-TESIS.cmd . El lanzador comprueba el paquete,
+   encuentra Python y abre la aplicacion. No hay que instalar dependencias:
+   las librerias websocket y pypdf ya vienen incluidas en esta carpeta.
+3. Si quieres comprobar el paquete sin abrir la app, haz doble clic en
+   VERIFICAR.cmd . No usa Internet ni lee tus claves.
+
+REQUISITO UNICO
+---------------
+Python 3.11 o superior con Tkinter y SQLite. El instalador de python.org ya los
+incluye (marca "tcl/tk and IDLE" y "py launcher"). Este paquete NO instala ni
+modifica Python; si falta, el lanzador lo dice y no cambia nada en tu equipo.
+
+IMPORTANTE
+----------
+* Es un BUILD DE DESARROLLO, no una release publicada ni una version verificada
+  con Microsoft. La correccion de continuidad de Copilot esta implementada y
+  probada localmente, pero la continuidad real con tu cuenta de Microsoft 365
+  TODAVIA no se ha comprobado.
+* Prueba primero con un proyecto SIN datos personales. La "Prueba de aceptacion
+  real" esta en CONTINUIDAD-COPILOT.md .
+* No pegues tokens, contrasenas ni URLs autenticadas. Nexo guarda su
+  configuracion en %USERPROFILE%\.nexo-tesis .
+* Word nativo requiere Microsoft Word y PowerShell en Windows. El modelo de voz
+  Vosk NO esta incluido y no hace falta para usar la aplicacion.
+* Manten este paquete en un lugar privado: el codigo incluye el piloto academico
+  con institucion y centro educativo.
+
+Archivos: README.md (manual completo), CONTINUIDAD-COPILOT.md (cambios y prueba),
+VERSION.json, SHA256SUMS.txt (integridad) y LICENSE + licencias de pypdf/websocket.

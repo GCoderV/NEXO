@@ -21,9 +21,11 @@ Código y contexto para continuar el desarrollo en una sesión limpia.
 >
 > **Descarga (build de desarrollo, no release):**
 > [nexo-tesis-v0.4.1-dev-windows.zip](releases/nexo-tesis-v0.4.1-dev-windows.zip)
-> (576,314 bytes, 108 archivos). SHA-256: `06177c2d9c4c231a8be1617eed81f40d2feb5b7217103857abbaceabff2ef9d3`.
-> Runtime limpio para Windows; descomprimir y ejecutar `INICIAR-TESIS.cmd`.
-> Incluye aviso de estado y `CONTINUIDAD-COPILOT.md`. Los ZIP 0.4.0 y 0.3.1
+> (580,516 bytes, 111 archivos). SHA-256: `84c6ef03300a2601c9b407f34c166d6eeed723d5bed39fe97e54acd71139d852`.
+> **Listo para usar:** descomprimir en una carpeta vacía y hacer doble clic en
+> `INICIAR-TESIS.cmd` (se autoverifica y abre la app). Requiere Python 3.11+ con
+> Tkinter; no instala nada. Incluye `LEER-PRIMERO.txt`, `VERIFICAR.cmd`, aviso de
+> estado y `CONTINUIDAD-COPILOT.md`. Los ZIP 0.4.0 y 0.3.1
 > originales siguen en `releases/` sin cambios.
 
 ## Estado de la copia
