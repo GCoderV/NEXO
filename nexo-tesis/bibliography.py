@@ -11,6 +11,70 @@ class NoRedirect(urllib.request.HTTPRedirectHandler):
 
 def clean(value):return html.unescape(re.sub('<[^>]+>',' ',str(value or ''))).strip()
 
+_STOP=set('and or not near the a an of in on for to with is are de del la los las el un una y o en para con por desde hasta sobre site filetype'.split())
+
+def normalize_queries(raw,limit=3,max_chars=180):
+    """Turn a chat model's long boolean query into simple Crossref queries.
+
+    Models write ("cooperative learning" OR ...) AND ...; site:... Crossref's
+    `query.bibliographic` understands none of that, and the old 250-character
+    cap rejected the whole proposal before any request was sent. Here we keep
+    quoted phrases intact, drop boolean/Google syntax, and DISTRIBUTE the terms
+    across up to `limit` short queries instead of truncating away half of them.
+    """
+    limit=max(1,min(limit,3))
+    if not isinstance(raw,str):return []
+    text=re.sub(r'https?://\S+',' ',raw)
+    parts=[x.strip() for x in re.split(r'[;\n]+',text) if x.strip()]
+    if not parts:return []
+    if len(parts)>1:
+        out=[]
+        for part in parts:
+            for q in normalize_queries(part,limit=limit,max_chars=max_chars):
+                if q not in out:out.append(q)
+            if len(out)>=limit:break
+        return out[:limit]
+    chunk=re.sub(r'\b[A-Za-z]+:[^\s]+',' ',parts[0])         # site:..., filetype:...
+    phrases=[]
+    for match in re.finditer(r'"([^"]{2,80})"',chunk):
+        phrase=re.sub(r'\s+',' ',re.sub(r'[^\w\s-]',' ',match.group(1))).strip()
+        if phrase and phrase.lower() not in [x.lower() for x in phrases]:phrases.append(phrase)
+    rest=re.sub(r'"[^"]*"',' ',chunk)
+    rest=re.sub(r'\b(?:AND|OR|NOT|NEAR)\b',' ',rest,flags=re.I)
+    rest=re.sub(r'[^\w\s-]',' ',rest)
+    known=set(re.findall(r'\w+',' '.join(phrases).lower()))
+    words=[]
+    for word in re.sub(r'\s+',' ',rest).strip().split():
+        low=word.lower().strip('-')
+        if len(low)<2 or low in _STOP or low in known:continue
+        if low not in [w.lower() for w in words]:words.append(word)
+    units=[]
+    for unit in phrases+words:
+        if len(unit)>max_chars:unit=unit[:max_chars].rsplit(' ',1)[0] or unit[:max_chars]
+        if len(unit)>=2 and unit not in units:units.append(unit)
+    if not units:return []
+    def join(items):
+        query=''
+        for unit in items:
+            if len(query)+len(unit)+1>max_chars:break
+            query=(query+' '+unit).strip()
+        return query
+    # A focused core query (high recall) plus variants that rotate the remaining
+    # qualifiers. Cramming every synonym into one request returns nothing.
+    core=units[:min(4,len(units))]
+    extra=units[len(core):]
+    out=[]
+    base=join(core)
+    if len(base)>=2:out.append(base)
+    if extra and len(out)<limit:
+        count=min(limit-len(out),len(extra))
+        buckets=[[] for _ in range(count)]
+        for i,unit in enumerate(extra):buckets[i%count].append(unit)
+        for bucket in buckets:
+            query=join(core+bucket)
+            if len(query)>=2 and query not in out:out.append(query)
+    return out[:limit]
+
 def search(query,rows=5):
     if not isinstance(query,str) or not 2<=len(query.strip())<=250:raise ValueError('Consulta bibliográfica de 2 a 250 caracteres.')
     if type(rows) is not int or not 1<=rows<=5:raise ValueError('Máximo cinco resultados por consulta.')

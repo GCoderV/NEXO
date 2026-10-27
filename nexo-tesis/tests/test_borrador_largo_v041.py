@@ -170,7 +170,7 @@ class SelfCheckTests(unittest.TestCase):
         meta = json.loads((ROOT / 'VERSION.json').read_text('utf-8'))
         self.assertEqual(meta['version'], VERSION)
         self.assertEqual(meta['build'], BUILD)
-        self.assertEqual(BUILD, 'longdraft-1')
+        self.assertEqual(BUILD, 'agentloop-1')
 
     def test_exact_shape_of_the_user_reply(self):
         # Same top-level keys and escaped-newline markdown as the reported reply.

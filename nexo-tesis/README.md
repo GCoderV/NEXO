@@ -204,6 +204,50 @@ Un tiempo de espera puede dejar un efecto parcial: **inspecciona Word antes de r
 
 Si una operación falla o agota el tiempo, puede haber dejado un efecto parcial. **No la repitas a ciegas**: inspecciona la copia; revierte desde Word o vuelve a una copia previa según corresponda.
 
+## Agente con herramientas y documento completo (0.4.1-dev, `agentloop-1`)
+
+El modo autónomo ya no se queda sin tareas mientras haya trabajo pendiente. Se
+corrigió la causa real: las consultas booleanas de 340–414 caracteres se
+rechazaban por un límite de 250 y nunca llegaban a Crossref. Ahora
+`bibliography.normalize_queries()` las divide en un máximo de 3 consultas
+simples, se aprueban y se ejecutan. El botón **«Buscar fuentes»** permite
+buscar sin esperar a que el modelo lo proponga; si no hay red, puedes dar de
+alta fuentes a mano en la pestaña Fuentes. `autonomy.plan()` desbloquea
+Instrumentos con un borrador de Metodología, ofrece Cronograma/Presupuesto/
+Anexos como plantillas «Por definir» y explica exactamente qué falta cuando no
+hay tareas elegibles. **Antecedentes** se redacta dentro del Marco teórico y
+**Referencias** se reconstruye desde el registro de fuentes.
+
+Nuevo **bucle de agente acotado** (botón «Agente con herramientas» en
+Conversación o «Completar lo que falta» en Documento). El usuario aprueba el
+objetivo, el número de pasos (2–12) y la carpeta de exportación. El modelo
+responde con `{"reply","tool_calls","done"}` y el anfitrión valida y ejecuta 15
+herramientas: inspeccionar el documento, ver pendientes, leer un apartado,
+listar fuentes, buscar fuentes, escribir un apartado, **editar solo el fragmento
+que falta** (`insertar_despues`/`reemplazar`/`eliminar`), **añadir, quitar o
+restaurar apartados**, registrar datos con evidencia literal, preguntar al
+usuario y finalizar. Máximo 4 herramientas por paso. Se detiene por
+`finalizar`, pregunta al usuario, ausencia de herramientas, límite de pasos o
+falta de progreso medible dos pasadas seguidas, y deja un **recibo auditable**
+en «Ver recibo del agente». Los fallos de herramientas se contienen como datos.
+
+La pestaña **Documento** muestra la estructura, permite alto/ocultado (ocultar
+NO borra el borrador) y **«Generar documento completo»** exporta sin modelo,
+sin red y sin Word: `.md`, `.html` y un `.docx` OOXML estándar escrito con la
+biblioteca estándar. Los apartados pendientes se imprimen como
+`**[Por redactar]**`. No se inventan fuentes, autorías, años, DOI ni resultados;
+los apartados aprobados o editados por ti son inmutables para el agente y Word
+nunca se modifica. Ideas funcionales de proyectos abiertos (DoThesis, Loopy,
+agentic-thesis-writing, Academic Writing Toolkit, OpenDraft) en
+`AGENTE-LOOP-Y-DOCUMENTO.md`, incluido en este paquete.
+
+`VERIFICAR.cmd` muestra `(agentloop-1)` y ejecuta tres comprobaciones
+funcionales sin red: borradores largos, consultas largas + planificador y un
+bucle completo del agente con exportación válida. **416 pruebas** superadas /
+2 omitidas con fixtures sintéticas. Sin verificación real de Tk, Word COM,
+DPAPI, Microsoft 365 Copilot ni de que Word abra el DOCX generado en este
+entorno.
+
 ## Datos, recuperación y comprobaciones de esta versión
 
 En `%USERPROFILE%\.nexo-tesis\`:

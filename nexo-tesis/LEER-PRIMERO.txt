@@ -66,17 +66,41 @@ Para continuar SIN reiniciar el conjunto:
    Indica exactamente que parte de la respuesta no se pudo usar, sin mostrar
    el contenido del modelo.
 
+NUEVO: AGENTE CON HERRAMIENTAS Y DOCUMENTO COMPLETO
+-----------------------------------------------------
+* Pestana "Documento" > "Generar documento completo": crea tres archivos
+  (.md, .html y .docx) en la carpeta que elijas. NO usa modelo, NO usa
+  Internet y NO abre Word. Lo que falta aparece como "[Por redactar]":
+  Nexo NO inventa contenido, autores, anos, DOI ni resultados.
+* Pestana "Documento" > "Completar lo que falta" (o "Agente con herramientas"
+  en Conversacion): el agente trabaja en 2-12 pasos acotados, aprueba el
+  objetivo antes de empezar y deja un recibo en "Ver recibo del agente".
+  Puede inspeccionar, buscar fuentes, escribir apartados, EDITAR solo la
+  parte que falta, y ANADIR o QUITAR apartados (ocultar conserva el borrador).
+  Nunca modifica Word ni los apartados que aprobaste o editaste tu.
+* Boton "Buscar fuentes": escribe terminos y autoriza las consultas exactas.
+  Las consultas largas con AND/OR ya NO se rechazan: se dividen en un maximo
+  de 3 busquedas simples. Si no hay conexion con Crossref, el aviso lo indica
+  y puedes anadir las fuentes a mano en la pestana "Fuentes".
+* "Incluir apartados opcionales" viene activado: Cronograma, Presupuesto y
+  Anexos se generan como PLANTILLAS con campos "Por definir", sin inventar
+  fechas ni importes. Un borrador de Metodologia desbloquea Instrumentos.
+* "Antecedentes" se redacta dentro del Marco teorico y las Referencias se
+  construyen solo con las fuentes registradas en el proyecto.
+
 COMO SABER SI TIENES LA VERSION CORREGIDA
 -----------------------------------------
 Haz doble clic en VERIFICAR.cmd . En la pantalla debe aparecer:
 
-    Nexo Tesis 0.4.1-dev (longdraft-1) - comprobacion local (sin red)
+    Nexo Tesis 0.4.1-dev (agentloop-1) - comprobacion local (sin red)
     ...
     Borradores largos: OK (hasta 20000 caracteres).
+    Busqueda y plan: OK (consultas largas + apartados pendientes).
+    Agente con herramientas: OK (inspeccionar, escribir, exportar, recibo).
     Todo correcto.
 
-Si NO aparece la linea "Borradores largos: OK" o no dice
-"(longdraft-1)", estas abriendo una copia VIEJA de Nexo. Cierra la
+Si NO aparecen las tres lineas "OK" o no dice
+"(agentloop-1)", estas abriendo una copia VIEJA de Nexo. Cierra la
 aplicacion, descarga el ZIP nuevo y descomprimelo en una carpeta VACIA.
 Tus proyectos NO estan dentro de esa carpeta: estan en
 %USERPROFILE%\.nexo-tesis y se conservan.

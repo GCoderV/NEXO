@@ -21,17 +21,29 @@ Código y contexto para continuar el desarrollo en una sesión limpia.
 >
 > **Descarga (build de desarrollo, no release):**
 > [nexo-tesis-v0.4.1-dev-windows.zip](releases/nexo-tesis-v0.4.1-dev-windows.zip)
-> (600,261 bytes, 114 archivos). SHA-256: `492262320f6236a125723488420138cd122d743f6572bdf422c8f1e12a5e3c40`.
-> **Corregido el error «La respuesta no cumple el formato académico» en
-> apartados largos**: límites unificados en `limits.py` (borrador de 20 000
-> caracteres), recorte visible en vez de rechazo y normalización de etiquetas,
-> alias y fuentes. También se curan el 404 de modelo Gemini obsoleto y el 400
-> por `response_format`. Además incluye la auditoría de robustez.
-> Informes: [INCIDENCIA-FORMATO-BORRADOR.md](contexto/INCIDENCIA-FORMATO-BORRADOR.md)
-> y [AUDITORIA-ROBUSTEZ.md](contexto/AUDITORIA-ROBUSTEZ.md).
-> 369 pruebas superadas / 2 omitidas. `VERIFICAR.cmd` debe mostrar
-> `(longdraft-1)` y «Borradores largos: OK» para confirmar la copia correcta.
-> Ver `LEER-PRIMERO.txt`.
+> (629.073 bytes, 117 archivos, build `agentloop-1`). SHA-256:
+> `d4200de4a021b1e9d4fdb934324f8b4e398c801321ce026248588ae514f47094`.
+> Página autónoma con el ZIP embebido (sin GitHub ni servidor):
+> [descarga/descargar-nexo-tesis.html](descarga/descargar-nexo-tesis.html).
+>
+> **Correcciones de esta copia:** consultas booleanas largas que antes se
+> rechazaban y nunca llegaban a Crossref; botón «Buscar fuentes»; planificador
+> que ya no declara «no hay tareas» mientras falten apartados; borradores de
+> 20 000 caracteres con recorte visible; Copilot365 sin API key; JSON válido
+> envuelto aceptado; auditoría de robustez. Ver
+> [AGENTE-LOOP-Y-DOCUMENTO.md](contexto/AGENTE-LOOP-Y-DOCUMENTO.md) y
+> [INCIDENCIA-FORMATO-BORRADOR.md](contexto/INCIDENCIA-FORMATO-BORRADOR.md).
+>
+> **Nuevo:** agente con herramientas en bucle acotado (15 herramientas, 2–12
+> pasos, recibo auditable) para inspeccionar el documento, buscar fuentes,
+> escribir o **editar solo la parte que falta**, añadir/quitar apartados y
+> **generar el documento completo** en Markdown, HTML y DOCX OOXML sin Word,
+> sin red y sin dependencias. Ideas funcionales de DoThesis, Loopy,
+> agentic-thesis-writing, Academic Writing Toolkit, OpenDraft,
+> open-paper-machine, paper-revision-skill y agentic-research (enlaces en el
+> informe). 416 pruebas superadas / 2 omitidas. `VERIFICAR.cmd` debe mostrar
+> `(agentloop-1)` y tres líneas «OK» para confirmar la copia correcta.
+>
 > **Listo para usar:** descomprimir en una carpeta vacía y hacer doble clic en
 > `INICIAR-TESIS.cmd` (se autoverifica y abre la app). Requiere Python 3.11+ con
 > Tkinter; no instala nada. Incluye `LEER-PRIMERO.txt`, `VERIFICAR.cmd`, aviso de

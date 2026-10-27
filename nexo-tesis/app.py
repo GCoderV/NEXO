@@ -10,6 +10,7 @@ from tkinter import ttk, messagebox, filedialog, simpledialog
 from tkinter.scrolledtext import ScrolledText
 from project_store import ProjectStore, FACT_KEYS, SECTIONS, LABELS, message, set_fact, invalidate, export_markdown, now
 from version import VERSION
+import document
 from config import Config
 from providers import PROVIDERS
 from agent import Agent
@@ -17,6 +18,10 @@ from bibliography import add_fragment
 from word_bridge import WordBridge
 
 APP_VERSION=VERSION
+DEFAULT_LOOP_GOAL=('Revisa el documento, identifica los apartados pendientes y complétalos con '
+                   'contenido provisional basado en los datos del proyecto. Edita solo las partes que faltan, '
+                   'no reescribas lo ya válido, y genera el documento completo al final. '
+                   'No inventes fuentes, autores, años, DOI ni resultados.')
 BG='#f2f5f5';INK='#183537';TEAL='#167d80';MUTED='#63777a';PAPER='#ffffff'
 
 class Application:
@@ -24,7 +29,7 @@ class Application:
         self.root=root;self.store=store or ProjectStore();self.config=config or Config(self.store.root)
         self.api_factory=api_factory or self.config.api;self.searcher=searcher;self.word_factory=word_factory or WordBridge
         self.project=None;self.bridge=None;self.busy=False;self.stop=threading.Event();self.events=queue.Queue();self.controls=[];self.inputs=[];self.project_ids=[];self.consent=set();self.documents=[];self.word_origin=None;self.input_origin='usuario';self.pending_user_text=None
-        self.allow_research=tk.BooleanVar(value=False);self.status=tk.StringVar(value='Crea un proyecto con un tema. Tu información no se comparte entre proyectos.')
+        self.allow_research=tk.BooleanVar(value=False);self.include_optional=tk.BooleanVar(value=True);self.loop_passes=tk.StringVar(value='6');self.status=tk.StringVar(value='Crea un proyecto con un tema. Tu información no se comparte entre proyectos.')
         root.title('Nexo Tesis · agente académico independiente');root.geometry('1040x750');root.minsize(740,560);root.configure(bg=BG)
         self.styles();root.columnconfigure(1,weight=1);root.rowconfigure(1,weight=1)
         header=ttk.Frame(root,padding=(20,14));header.grid(row=0,column=0,columnspan=2,sticky='ew');header.columnconfigure(0,weight=1)
@@ -43,7 +48,7 @@ class Application:
         self.title=ttk.Label(main,text='De una idea a un trabajo fundamentado',font=('Segoe UI',15,'bold'),wraplength=700);self.title.grid(row=0,column=0,sticky='w',pady=(4,5))
         self.project_state=ttk.Label(main,text='Un tema es suficiente para empezar. El agente preguntará lo necesario.',style='Muted.TLabel',wraplength=690);self.project_state.grid(row=1,column=0,sticky='w',pady=(0,12))
         self.tabs=ttk.Notebook(main);self.tabs.grid(row=2,column=0,sticky='nsew')
-        self.build_chat();self.build_drafts();self.build_memory();self.build_sources();self.build_word()
+        self.build_chat();self.build_drafts();self.build_document();self.build_memory();self.build_sources();self.build_word()
         footer=ttk.Frame(root,padding=(16,6,16,10));footer.grid(row=2,column=0,columnspan=2,sticky='ew');footer.columnconfigure(0,weight=1)
         self.status_label=ttk.Label(footer,textvariable=self.status,style='Muted.TLabel',wraplength=900);self.status_label.grid(row=0,column=0,sticky='w')
         root.protocol('WM_DELETE_WINDOW',self.close);root.bind('<Configure>',self.resize);root.report_callback_exception=self.error_callback
@@ -111,8 +116,13 @@ class Application:
         self.resume_button=self.button(row,'Reanudar',self.resume);self.resume_button.pack(side='left',padx=(5,0))
         self.button(row,'Aplazar pregunta',self.defer_question).pack(side='left',padx=5)
         research=ttk.Checkbutton(row,text='Permitir búsqueda',variable=self.allow_research);research.pack(side='left',padx=4);self.controls.append(research)
+        self.button(row,'Buscar fuentes',self.search_sources).pack(side='left',padx=4)
         auto=ttk.Frame(f);auto.grid(row=2,column=0,sticky='ew',pady=(0,4))
         self.button(auto,'Trabajar solo',self.autonomous,True).pack(side='left')
+        optional=ttk.Checkbutton(auto,text='Incluir apartados opcionales',variable=self.include_optional);optional.pack(side='left',padx=(10,4));self.controls.append(optional)
+        self.button(auto,'Agente con herramientas',self.start_agent_loop,True).pack(side='left',padx=(10,0))
+        ttk.Label(auto,text='Pasos:').pack(side='left',padx=(6,2))
+        passes=ttk.Combobox(auto,textvariable=self.loop_passes,values=('2','4','6','8','12'),width=3,state='readonly');passes.pack(side='left');self.controls.append(passes)
         ttk.Label(auto,text='Máx. apartados:').pack(side='left',padx=(8,4))
         self.auto_limit=tk.StringVar(value='6');limit=ttk.Combobox(auto,textvariable=self.auto_limit,values=('2','4','6','8','12'),width=3,state='readonly');limit.pack(side='left');self.controls.append(limit)
         ttk.Label(auto,text='Se guarda cada avance · Word requiere aprobación',style='Muted.TLabel',wraplength=160).pack(side='left',padx=6)
@@ -130,12 +140,102 @@ class Application:
         return 'break'
     def build_drafts(self):
         f=self.tab('Apartados');f.rowconfigure(2,weight=1)
-        self.draft_key=tk.StringVar(value='delimitacion');self.draft_choice=ttk.Combobox(f,values=[LABELS[k] for k in SECTIONS],state='readonly');self.draft_choice.current(0);self.draft_choice.grid(row=0,column=0,sticky='ew');self.draft_choice.bind('<<ComboboxSelected>>',lambda e:self.guard(self.select_draft));self.controls.append(self.draft_choice)
+        self.draft_keys=list(SECTIONS);self.draft_key=tk.StringVar(value='delimitacion');self.draft_choice=ttk.Combobox(f,values=[LABELS[k] for k in SECTIONS],state='readonly');self.draft_choice.current(0);self.draft_choice.grid(row=0,column=0,sticky='ew');self.draft_choice.bind('<<ComboboxSelected>>',lambda e:self.guard(self.select_draft));self.controls.append(self.draft_choice)
         self.draft_status=ttk.Label(f,text='Todavía no hay borrador.',style='Muted.TLabel',wraplength=680);self.draft_status.grid(row=1,column=0,sticky='w',pady=7)
         self.draft_text=self.textbox(f,12);self.draft_text.grid(row=2,column=0,sticky='nsew')
         row=ttk.Frame(f);row.grid(row=3,column=0,sticky='ew',pady=(8,0))
         self.button(row,'Guardar revisión',self.save_draft).pack(side='left');self.button(row,'Aprobar borrador',self.approve_draft).pack(side='left',padx=4);self.button(row,'Preparar en Word',self.to_word).pack(side='left')
         self.draft_loaded=''
+    def build_document(self):
+        f=self.tab('Documento');f.rowconfigure(1,weight=1)
+        ttk.Label(f,text='Estructura del documento completo. Ocultar un apartado NO borra su borrador. La exportación genera Markdown, HTML y DOCX sin Word, sin internet y sin dependencias.',style='Muted.TLabel',wraplength=680).grid(row=0,column=0,sticky='w')
+        self.doc_tree=ttk.Treeview(f,columns=('apartado','estado','caracteres','visible'),show='headings',height=12)
+        for col,label,width in (('apartado','Apartado',250),('estado','Estado',150),('caracteres','Caracteres',90),('visible','En documento',100)):
+            self.doc_tree.heading(col,text=label);self.doc_tree.column(col,width=width,anchor='w')
+        self.doc_tree.grid(row=1,column=0,sticky='nsew',pady=8)
+        row=ttk.Frame(f);row.grid(row=2,column=0,sticky='ew')
+        self.button(row,'Generar documento completo',self.generate_document,True).pack(side='left')
+        self.button(row,'Completar lo que falta',lambda:self.start_agent_loop(DEFAULT_LOOP_GOAL)).pack(side='left',padx=4)
+        row2=ttk.Frame(f);row2.grid(row=3,column=0,sticky='ew',pady=(6,0))
+        self.button(row2,'Añadir apartado',self.doc_add_section).pack(side='left')
+        self.button(row2,'Quitar / restaurar',self.doc_toggle_section).pack(side='left',padx=4)
+        self.button(row2,'Ver recibo del agente',self.show_loop_receipt).pack(side='left',padx=4)
+        self.doc_status=ttk.Label(f,text='',style='Muted.TLabel',wraplength=680)
+        self.doc_status.grid(row=4,column=0,sticky='w',pady=(8,0))
+    def refresh_document(self):
+        if not hasattr(self,'doc_tree'):return
+        self.doc_tree.delete(*self.doc_tree.get_children())
+        if not self.project:return
+        for e in document.outline(self.project):
+            state=e['status'] if e['has_draft'] else 'sin borrador'
+            self.doc_tree.insert('','end',iid=e['key'],values=(e['label'],state,e['chars'],'sí' if e['visible'] else 'no'))
+        last=self.project.get('last_loop')
+        if last:self.doc_status.configure(text='Último agente: '+str(last['passes'])+' pasos · '+str(last['changes'])+' cambios · motivo: '+last['stopped'])
+    def generate_document(self):
+        self.require_project();self.ensure_clean_draft()
+        folder=filedialog.askdirectory(parent=self.root,title='Carpeta donde guardar el documento completo')
+        if not folder:return
+        info=document.export(self.project,folder)
+        self.status.set('Documento completo generado en '+info['directory']+' · '+str(len(info['gaps']))+' avisos de huecos.')
+        messagebox.showinfo('Documento completo generado',
+            'Archivos:\n• '+'\n• '.join(info['files'])+'\n\nCarpeta: '+info['directory']+
+            '\n\nApartados incluidos: '+str(info['sections'])+'. Tamaño total: '+str(info['bytes'])+' bytes.'+
+            '\n\nPENDIENTE (no se inventó contenido):\n• '+'\n• '.join(info['gaps'])+
+            '\n\nNo se conectó a Word ni a internet. El DOCX es OOXML estándar; verifícalo en tu Word.',parent=self.root)
+    def doc_add_section(self):
+        self.require_project();self.ensure_clean_draft()
+        title=simpledialog.askstring('Añadir apartado','Título del apartado nuevo:',parent=self.root)
+        if not title or not title.strip():return
+        made=document.add_extra(self.project,title.strip())
+        self.store.save(self.project,'doc-extra-added');self.render()
+        self.status.set('Añadido «'+made['label']+'». No se creó contenido: pide al agente que lo redacte.')
+    def doc_toggle_section(self):
+        self.require_project();self.ensure_clean_draft()
+        selected=self.doc_tree.selection()
+        if not selected:raise ValueError('Selecciona un apartado en la lista.')
+        key=selected[0];visible=not document.outline_key_visible(self.project,key)
+        made=document.set_visible(self.project,key,visible)
+        self.store.save(self.project,'doc-visibility');self.render()
+        self.status.set(made['label']+(' vuelve al documento.' if visible else ' ocultado; su borrador se conservó.'))
+    def show_loop_receipt(self):
+        self.require_project()
+        last=self.project.get('last_loop')
+        if not last:messagebox.showinfo('Recibo del agente','Todavía no se ha ejecutado un agente con herramientas en este proyecto.',parent=self.root);return
+        win=tk.Toplevel(self.root);win.title('Recibo del agente');win.geometry('760x560');win.transient(self.root)
+        text=self.textbox(win,22,True);text.pack(fill='both',expand=True,padx=10,pady=10)
+        lines=['OBJETIVO: '+last['goal'],'PASOS: '+str(last['passes'])+' · CAMBIOS: '+str(last['changes'])+' · MOTIVO DE PARADA: '+last['stopped'],'']
+        lines += ['PASO '+str(a['pass'])+' · '+('OK' if a['ok'] else 'FALLO')+' · '+a['tool']+' → '+a['summary'] for a in last['actions']]
+        lines += ['','ESTADO FINAL DEL DOCUMENTO','Con borrador: '+str(last['state']['with_draft'])+'/'+str(last['state']['sections']),'Fuentes: '+str(last['state']['sources'])]
+        lines += ['Huecos:']+['• '+g for g in last['state']['gaps']]
+        self.put(text,'\n'.join(lines),True)
+    def start_agent_loop(self,goal=None):
+        """Bounded tool-using loop: the user approves the exact goal and limits."""
+        self.require_project();self.ensure_clean_draft()
+        if self.busy:return
+        if self.project.get('pending'):raise ValueError('Hay una petición pendiente. Usa Reanudar antes de iniciar otro agente.')
+        goal=goal or simpledialog.askstring('Agente con herramientas','Objetivo concreto del agente:',parent=self.root,initialvalue=DEFAULT_LOOP_GOAL)
+        if not goal or not goal.strip():return
+        try:passes=int(self.loop_passes.get())
+        except (ValueError,TypeError):passes=6
+        passes=max(1,min(passes,12));goal=goal.strip()
+        research=bool(self.allow_research.get())
+        docs=str(Path.home()/'.nexo-tesis'/'documentos')
+        notice=('El agente trabajará en hasta '+str(passes)+' pasos con herramientas acotadas: inspeccionar el documento, '
+                'buscar fuentes (solo si «Permitir búsqueda» está activo y autorizas cada consulta), escribir o editar apartados, '
+                'añadir/quitar apartados y generar el documento completo en:\n\n'+docs+
+                '\n\nObjetivo:\n'+goal+
+                '\n\nSe detiene solo, deja un recibo y NUNCA modifica Word. Los apartados aprobados o editados por ti están protegidos. '
+                'No se inventan fuentes, autores ni resultados. ¿Iniciar?')
+        if not messagebox.askyesno('Agente con herramientas · aprobar',notice,parent=self.root):return
+        api=self.api_factory()
+        if not self.authorize(api):return
+        from agent import Agent
+        id=self.project['id'];self.stop.clear();self.pending_user_text=None
+        worker=Agent(self.store,api,self.ask_search,self.searcher,self.stop,lambda s:self.events.put(('status',s)))
+        config={'goal':goal,'max_passes':passes,'allow_research':research,'allow_export':True,
+                'export_dir':docs,'producer':str(getattr(api,'provider','agente'))}
+        self.run_job(lambda:worker.turn(id,goal,allow_research=research,origin='usuario',loop=config),
+                     lambda p:self.finish_turn(id,p),research=research)
     def build_memory(self):
         f=self.tab('Memoria');f.rowconfigure(0,weight=1)
         self.memory_text=self.textbox(f,12,True);self.memory_text.grid(row=0,column=0,sticky='nsew')
@@ -209,18 +309,18 @@ class Application:
     def render(self):
         self.chat.configure(state='normal');self.chat.delete('1.0','end')
         if not self.project:
-            self.chat.insert('end','Tu tema, tu proyecto.\n\n','heading');self.chat.insert('end','Escribe un tema abajo o pulsa «Nuevo proyecto».\n\nEl agente te ayudará a delimitarlo, reunir fuentes y desarrollar los apartados. Hará las preguntas que necesite y conservará las decisiones de cada proyecto por separado.\n\nConfigura un modelo para conversar y redactar. Sin modelo puedes crear proyectos y consultar lo guardado; no se simula una investigación.');self.chat.configure(state='disabled');return
+            self.chat.insert('end','Tu tema, tu proyecto.\n\n','heading');self.chat.insert('end','Escribe un tema abajo o pulsa «Nuevo proyecto».\n\nEl agente te ayudará a delimitarlo, reunir fuentes y desarrollar los apartados. Hará las preguntas que necesite y conservará las decisiones de cada proyecto por separado.\n\nConfigura un modelo para conversar y redactar. Sin modelo puedes crear proyectos y consultar lo guardado; no se simula una investigación.');self.chat.configure(state='disabled');self.refresh_document();return
         p=self.project;self.title.configure(text=p['topic'][:180]+('…' if len(p['topic'])>180 else ''))
         state={'esperando_respuesta':'esperando tu respuesta','interrumpido':'interrumpido','listo':'listo','error':'revisa el último aviso','error_formato':'respuesta no estructurada: revisa el aviso','detenido':'detenido','sin_avance':'sin avance: revisa el aviso'}.get(p['run'].get('status'),'en curso')
         self.project_state.configure(text=f"{state} · {len(p['drafts'])} apartados · {len(p['sources'])} fuentes · {p['usage']['calls']} consultas al modelo")
         # Full history persists; UI shows latest 100 messages for responsiveness.
         for m in p['messages'][-100:]:
             self.chat.insert('end',{'user':'TÚ','assistant':'NEXO TESIS · PROPUESTA','system':'REGISTRO'}[m['role']]+'\n','heading');self.chat.insert('end',m['text']+'\n\n')
-        self.chat.configure(state='disabled');self.chat.see('end');self.load_draft();self.render_memory()
+        self.chat.configure(state='disabled');self.chat.see('end');self.refresh_draft_choices();self.load_draft();self.render_memory()
         self.source_choice.configure(values=[s['id']+' · '+s['title'][:65] for s in p['sources']])
         if p['sources']:self.source_choice.current(len(p['sources'])-1)
         else:self.source_choice.set('')
-        self.show_source()
+        self.show_source();self.refresh_document()
     def render_memory(self):
         if not self.project:return
         p=self.project;lines=['DATOS Y DECISIONES — revisa la interpretación del agente','']
@@ -230,10 +330,18 @@ class Application:
         lines += [f"[{q['status']}] {q['text']}" for q in p['questions']]
         lines += ['','PERFIL: '+(p['profile']['name'] if p.get('profile') else 'General provisional; ninguna universidad o metodología impuesta.'),'','Los cambios de datos centrales marcan los borradores para revisión. No los corrigen ni aprueban silenciosamente.']
         self.put(self.memory_text,'\n'.join(lines),True)
+    def refresh_draft_choices(self):
+        keys=document.order(self.project) if self.project else list(SECTIONS)
+        self.draft_keys=keys
+        self.draft_choice.configure(values=[document.label(self.project,k) if self.project else LABELS[k] for k in keys])
+        current=self.draft_key.get()
+        if current in keys:self.draft_choice.current(keys.index(current))
+        elif keys:self.draft_choice.current(0);self.draft_key.set(keys[0])
     def select_draft(self):
-        newkey=SECTIONS[self.draft_choice.current()]
+        idx=self.draft_choice.current();newkey=self.draft_keys[idx] if 0<=idx<len(self.draft_keys) else SECTIONS[0]
         if self.draft_text.get('1.0','end-1c')!=self.draft_loaded:
-            if not messagebox.askyesno('Revisión sin guardar','¿Descartar la revisión sin guardar y abrir otro apartado?',parent=self.root):self.draft_choice.current(SECTIONS.index(self.draft_key.get()));return
+            if not messagebox.askyesno('Revisión sin guardar','¿Descartar la revisión sin guardar y abrir otro apartado?',parent=self.root):
+                self.draft_choice.current(self.draft_keys.index(self.draft_key.get()));return
         self.draft_key.set(newkey);self.load_draft()
     def load_draft(self):
         d=(self.project or {}).get('drafts',{}).get(self.draft_key.get())
@@ -252,15 +360,20 @@ class Application:
         if not any(m['role']=='user' for m in self.project['messages']) and not self.project['drafts'] and not self.project['questions']:
             self.put(self.input,'Continúa: reúne todas las preguntas iniciales que falten en un solo bloque y aprovecha los datos aportados.');self.send();return
         from autonomy import plan,order
-        tasks,notice=plan(self.project)
-        if not tasks:self.status.set(notice);messagebox.showinfo('Pendientes del proyecto',notice,parent=self.root);return
+        tasks,notice=plan(self.project,bool(self.include_optional.get()))
+        if not tasks:
+            self.status.set(notice)
+            if not self.project.get('sources') and messagebox.askyesno('Pendientes del proyecto',notice+'\n\n¿Abrir la búsqueda de fuentes ahora?',parent=self.root):
+                self.search_sources()
+            else:messagebox.showinfo('Pendientes del proyecto',notice,parent=self.root)
+            return
         task=order(self.project,tasks[0]);self.put(self.input,'Desarrolla ahora '+task['label']+' con lo disponible; entrega el borrador concreto, no una promesa de continuar.');self.send(task=task)
     def autonomous(self):
         self.require_project();self.ensure_clean_draft()
         if self.input.get('1.0','end-1c').strip():raise ValueError('Envía primero el mensaje escrito; no se descartó.')
         if self.project.get('pending'):raise ValueError('Hay una petición pendiente. Usa Reanudar antes de iniciar una sesión autónoma.')
         from autonomy import plan,route_scope,AutonomousRunner
-        limit=int(self.auto_limit.get());tasks,notice=plan(self.project);tasks=tasks[:limit]
+        limit=int(self.auto_limit.get());optional=bool(self.include_optional.get());tasks,notice=plan(self.project,optional);tasks=tasks[:limit]
         if not tasks:messagebox.showinfo('Pendientes del proyecto',notice,parent=self.root);return
         api=self.api_factory()
         text='PLAN DE ESTA SESIÓN\n\n'+'\n'.join(str(i)+'. '+t['mode'].capitalize()+' '+t['label'] for i,t in enumerate(tasks,1))
@@ -270,7 +383,7 @@ class Application:
         id=self.project['id'];revision=self.project['revision'];scope=route_scope(api);research=self.allow_research.get();first=[api];self.stop.clear();self.pending_user_text=None
         def factory():return first.pop() if first else self.api_factory()
         runner=AutonomousRunner(self.store,factory,self.stop,lambda s:self.events.put(('status',s)),self.ask_search,self.searcher,on_progress=lambda p:self.events.put(('auto_progress',copy.deepcopy(p))))
-        self.run_job(lambda:runner.run(id,limit,research,scope,revision,tasks),lambda p:self.finish_turn(id,p,batch=True),research=research)
+        self.run_job(lambda:runner.run(id,limit,research,scope,revision,tasks,include_optional=optional),lambda p:self.finish_turn(id,p,batch=True),research=research)
     def ensure_clean_draft(self):
         if self.draft_text.get('1.0','end-1c')!=self.draft_loaded:raise ValueError('Guarda primero la revisión del apartado; no se descartó.')
     def defer_question(self):
@@ -340,7 +453,51 @@ class Application:
         self.project=p;self.render();self.refresh_projects();self.update_provider();self.status.set(('Pendiente: pulsa Reanudar · ' if p.get('pending') else 'Paso guardado · ')+p['run']['status']+' · tokens reportados: '+str(p['usage']['input_tokens']+p['usage']['output_tokens'])+' (no es saldo de cuenta)')
         session=p.get('autonomy',{})
         if batch and session and session.get('status')!='en_curso':self.status.set('Sesión autónoma: '+str(len(session['completed']))+'/'+str(len(session['tasks']))+' · '+session.get('reason','')+' · Revisa Apartados; Word no se modificó.')
+    def search_sources(self):
+        """Explicit, user-driven search. Does not depend on the model proposing it
+        nor on 'Permitir búsqueda'; the user sees and approves the exact queries."""
+        self.require_project();self.ensure_clean_draft()
+        if self.busy:return
+        query=simpledialog.askstring('Buscar fuentes','Términos (separados por ; para varias consultas):',parent=self.root)
+        if not query or not query.strip():return
+        from bibliography import normalize_queries
+        queries=normalize_queries(query.strip())
+        if not queries:messagebox.showerror('Buscar fuentes','No se pudo construir una consulta válida.',parent=self.root);return
+        preview='\n'.join('• '+q for q in queries)
+        if not messagebox.askyesno('Consulta bibliográfica',
+                'Se enviarán a Crossref hasta '+str(len(queries))+' consultas:\n\n'+preview+
+                '\n\nSe guardarán solo metadatos y resúmenes, no textos completos. No se envían datos del proyecto. ¿Continuar?',parent=self.root):return
+        id=self.project['id']
+        self.run_job(lambda:self._do_search(id,queries),lambda result:self._search_done(result),research=True)
+    def _do_search(self,id,queries):
+        import bibliography
+        p=self.store.load(id)
+        finder=self.searcher or bibliography.search
+        items=[];errors=[]
+        for q in queries:
+            try:
+                found=finder(q)
+                if isinstance(found,list):items.extend(found)
+            except Exception as e:errors.append(str(e)[:150])
+        added=bibliography.add_sources(p,items)
+        if added:self.store.save(p,'sources-searched')
+        return added,errors,p,queries
+    def _search_done(self,result):
+        added,errors,p,queries=result
+        if not self.project or self.project['id']!=p['id']:return
+        self.project=p;self.render();self.refresh_projects()
+        if added:
+            self.status.set('Fuentes nuevas: '+', '.join(added)+'. Ya puedes citar [F#] y generar Referencias.')
+            messagebox.showinfo('Buscar fuentes','Se agregaron '+str(len(added))+' fuentes: '+', '.join(added)+
+                '.\n\nSon metadatos o resúmenes de Crossref: verifica cada documento completo antes de usarlo como evidencia.'+
+                '\n\nAhora «Trabajar solo» puede revisar el Marco teórico con citas y generar Referencias.',parent=self.root)
+        else:
+            self.status.set('La búsqueda no devolvió fuentes nuevas; prueba términos más simples.')
+            messagebox.showinfo('Buscar fuentes','Crossref no devolvió resultados nuevos para:\n\n'+'\n'.join(queries)+
+                ('\n\nAvisos: '+'; '.join(errors[:2]) if errors else '')+
+                '\n\nSi no hay conexión con Crossref, añade las fuentes a mano en la pestaña Fuentes. Prueba también con 3-6 términos concretos: cooperative learning role play English speaking.',parent=self.root)
     def ask_search(self,query,reason):
+        self.events.put(('status','Autoriza la búsqueda bibliográfica en la ventana emergente…'))
         event=threading.Event();answer=[];self.events.put(('approval',query,reason,event,answer))
         while not event.wait(.1):
             if self.stop.is_set():return False
@@ -370,7 +527,7 @@ class Application:
                         self.project=item[1];self.render();self.set_busy(True)
                 elif item[0]=='approval':
                     _,query,reason,event,answer=item
-                    try:answer.append(False if self.stop.is_set() else messagebox.askyesno('Consulta bibliográfica',f'Se enviará a Crossref esta consulta exacta:\n\n{query}\n\nMotivo: {reason}\n\n¿Autorizar una consulta de hasta cinco resultados? No equivale a leer artículos completos.',parent=self.root))
+                    try:answer.append(False if self.stop.is_set() else messagebox.askyesno('Consulta bibliográfica',f'Se enviarán a Crossref estas consultas exactas (hasta 3, separadas por «;»):\n\n{query}\n\nMotivo: {reason}\n\n¿Autorizar hasta cinco resultados por consulta? Solo se guardan metadatos y resúmenes; no equivale a leer artículos completos.',parent=self.root))
                     finally:event.set()
                 elif item[0]=='done':
                     _,done,result,error=item;self.set_busy(False)

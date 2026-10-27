@@ -10,10 +10,11 @@ import unicodedata
 from limits import MAX_RESPONSE_CHARS, MAX_DRAFT_CHARS, MAX_REPLY_CHARS
 from project_store import FACT_KEYS, SECTIONS, LABELS, now, message, set_fact
 import bibliography
+import document
 import context_policy
 import conversation_state
 
-from prompt_policy import instructions, incremental_instructions
+from prompt_policy import instructions, incremental_instructions, loop_instructions
 SYSTEM=instructions()
 
 class Stopped(RuntimeError):pass
@@ -158,9 +159,16 @@ TASK_KEYS={'text','sources','reply','questions','question','search','drafts','fa
            'borrador','contenido','borradores','fuentes','resumen','apartado','section','seccion','draft'}
 TASK_MARKERS=('text','borrador','contenido','draft','drafts','borradores')
 
-def unpack(text,task=None):
+def unpack(text,task=None,tools=False):
     if not isinstance(text,str) or len(text)>MAX_RESPONSE_CHARS:raise ValueError('Respuesta del modelo vacía o demasiado larga.')
     result=parse_json(text)
+    if tools:
+        from agent_tools import validate_calls
+        if not isinstance(result,dict) or set(result)-{'reply','tool_calls','done','notes'}:raise ValueError('Respuesta de bucle incompatible.')
+        if not isinstance(result.get('reply'),str) or not 1<=len(result['reply'])<=MAX_REPLY_CHARS:raise ValueError('Falta explicación del paso.')
+        if type(result.get('done',False)) is not bool:raise ValueError('Campo done inválido.')
+        return {'reply':result['reply'],'tool_calls':validate_calls(result.get('tool_calls',[])),
+                'done':bool(result.get('done',False))}
     long_reply=isinstance(result.get('reply'),str) and len(result['reply'])>=1200 if isinstance(result,dict) else False
     if task and isinstance(result,dict) and (any(k in result for k in TASK_MARKERS) or long_reply):
         # In a task we already know the target section: ignore the model's own
@@ -214,7 +222,7 @@ def unpack(text,task=None):
     title=result.get('topic')
     if title is not None and (not isinstance(title,dict) or not isinstance(title.get('text'),str) or not 1<=len(title['text'])<=1500 or not isinstance(title.get('evidence'),str) or not 1<=len(title['evidence'])<=6000):raise ValueError('Tema propuesto inválido.')
     s=result.get('search')
-    if s is not None and (not isinstance(s,dict) or not isinstance(s.get('query'),str) or not 2<=len(s['query'])<=250 or not isinstance(s.get('reason'),str) or len(s['reason'])>1000):raise ValueError('Búsqueda inválida.')
+    if s is not None and (not isinstance(s,dict) or not isinstance(s.get('query'),str) or not 2<=len(s['query'])<=2000 or not isinstance(s.get('reason'),str) or len(s['reason'])>2000):raise ValueError('Búsqueda inválida.')
     result.setdefault('drafts',[])  # stable shape even when the model sent no draft
     return result
 
@@ -275,9 +283,70 @@ def apply_proposal(p,r,user_text,message_id,origin='usuario',material_ids=()):
 class Agent:
     def __init__(self,store,api,approve_search=None,searcher=None,stop=None,emit=None):
         self.store=store;self.api=api;self.approve_search=approve_search;self.searcher=searcher or bibliography.search;self.stop=stop or threading.Event();self.emit=emit or (lambda text:None)
+    def _loop_pass(self,p,op,r,origin,user_text,received_ids):
+        """Execute one bounded pass and decide whether another pass is justified.
+
+        Returns False when the loop must stop. Stops on: explicit finalizar, a
+        question to the user, no tool calls, exhausted passes, or no measurable
+        progress after two consecutive passes. Leaves an auditable receipt.
+        """
+        import agent_tools
+        state=op['loop'];state['passes']+=1
+        calls=r.get('tool_calls',[])
+        services={'searcher':self.searcher,'approve_search':self.approve_search,
+                  'allow_research':state.get('allow_research',False),
+                  'allow_export':state.get('allow_export',False),
+                  'export_dir':state.get('export_dir',''),
+                  'origin':origin,'user_text':user_text,
+                  'producer':str(getattr(self.api,'provider','agente'))+':'+str(getattr(self.api,'model','')),
+                  'store':self.store}
+        results=[];stop=None
+        for call in calls:
+            self.check()
+            self.emit('Agente · paso '+str(state['passes'])+'/'+str(state['max_passes'])+' · '+call['name'])
+            row=agent_tools.execute(p,call,services)
+            results.append(row)
+            if len(results)<=12:
+                state['actions'].append({'pass':state['passes'],'tool':row['tool'],
+                                         'ok':row['ok'],'changed':row['changed'],
+                                         'summary':row['summary'][:300]})
+            if row['changed']:state['changed']+=1
+            if row['stop'] and not stop:stop=row['stop']
+        state['actions']=state['actions'][-80:]
+        receipt='\n'.join(agent_tools.receipt_line(row) for row in results)[:3000]
+        state['receipt']=receipt;op['notice']=receipt
+        op['inflight']=False;op['uncertain']=False
+        message(p,'assistant',r['reply'])
+        message(p,'system','Paso '+str(state['passes'])+'/'+str(state['max_passes'])+' · '+(receipt or 'Sin acciones.'))
+        if r.get('done'):stop=stop or 'finalizado'
+        if not calls:stop=stop or 'sin_herramientas'
+        current=document.compact_state(p)
+        signature=json.dumps({k:current[k] for k in ('with_draft','missing','needs_revision','hidden','sources')},
+                             sort_keys=True,ensure_ascii=False)
+        changed_here=any(row['changed'] for row in results)
+        if state.get('signature')==signature and not changed_here:
+            state['stalls']=state.get('stalls',0)+1
+        else:
+            state['stalls']=0
+        state['signature']=signature
+        if not stop and state['stalls']>=2:stop='sin_progreso'
+        if not stop and state['passes']>=state['max_passes']:stop='limite_de_pasos'
+        p['last_step']={'operation':op['id'],'progress':state['changed']>0,'reason':receipt[:300]}
+        if stop:
+            state['reason']=stop
+            p['last_loop']={'goal':state['goal'],'passes':state['passes'],
+                            'changes':state['changed'],'stopped':stop,
+                            'actions':state['actions'][-40:],'state':current,'time':now()}
+            receipts=p.setdefault('loop_receipts',[])
+            receipts.append(p['last_loop']);del receipts[:-5]
+            message(p,'system','Bucle detenido ('+stop+'). '+str(state['changed'])+
+                    ' cambios guardados. El recibo queda en el proyecto; Word no se modificó.')
+            return False
+        return True
+
     def check(self):
         if self.stop.is_set():raise Stopped('Detenido. No se iniciarán más solicitudes; lo ya guardado permanece.')
-    def turn(self,project_id,user_text='',allow_research=False,origin='usuario',resume=False,refresh_context=False,task=None):
+    def turn(self,project_id,user_text='',allow_research=False,origin='usuario',resume=False,refresh_context=False,task=None,loop=None):
         p=self.store.load(project_id);self.store.recover(p)
         decision=conversation_state.pending(p,self.api)
         if decision:raise conversation_state.ContinuityPending(decision['message'])
@@ -306,6 +375,15 @@ class Agent:
             if task:
                 from autonomy import order
                 op['task']=order(p,task)
+            if loop:
+                op['loop']={'goal':str(loop.get('goal') or user_text)[:2000],
+                            'max_passes':max(1,min(int(loop.get('max_passes',6)),12)),
+                            'passes':0,'receipt':'','reason':'','actions':[],'changed':0,
+                            'stalls':0,'signature':'',
+                            'allow_research':bool(loop.get('allow_research',allow_research)),
+                            'allow_export':bool(loop.get('allow_export',False)),
+                            'export_dir':str(loop.get('export_dir') or ''),
+                            'producer':str(loop.get('producer') or 'agente-loop')}
             from conversation_state import load
             op['remote']=load(p,self.api)
             p['pending']=op
@@ -326,15 +404,28 @@ class Agent:
                 self.check()
                 if op['stage']=='search':
                     query=op['query']
+                    queries=bibliography.normalize_queries(query.get('query',''))
+                    if not queries:queries=[str(query.get('query',''))[:180]]
                     if not op.get('search_approved'):
-                        if not allow_research or self.approve_search is None or self.approve_search(query['query'],query['reason']) is not True:
+                        if not allow_research or self.approve_search is None or self.approve_search('; '.join(queries),query.get('reason','')) is not True:
                             message(p,'system','Búsqueda no autorizada. No se enviaron datos a Crossref.');break
                         op['search_approved']=True;checkpoint('search-approved')
                     self.check();p['run']['status']='busqueda';op['inflight']=True;checkpoint('search-intent');self.emit('Consultando metadatos bibliográficos…')
-                    try:
-                        items=self.searcher(query['query']);added=bibliography.add_sources(p,items)
-                        op['notice']='Búsqueda completada. IDs nuevos: '+', '.join(added)+'. Solo material indicado en el estado de cada fuente; no lectura completa.'
-                    except Exception as e:op['notice']='La búsqueda falló; no hay nuevos resultados: '+redact(e)[:400]
+                    items=[];failures=[]
+                    for q in queries:
+                        try:
+                            found=self.searcher(q)
+                            if isinstance(found,list):items.extend(found)
+                        except Exception as e:failures.append(redact(e)[:120])
+                    try:added=bibliography.add_sources(p,items)
+                    except Exception as e:added=[];failures.append(redact(e)[:120])
+                    if added:
+                        op['notice']=('Búsqueda completada con '+str(len(queries))+' consulta(s). IDs nuevos: '+', '.join(added)
+                                      +'. Cítalos como [F#] solo donde el metadato o resumen respalde la afirmación; no equivale a leer el texto completo.')
+                    else:
+                        op['notice']=('La búsqueda en Crossref no devolvió fuentes nuevas para: '+'; '.join(queries)
+                                      +'. Prueba términos más simples o pulsa «Buscar fuentes» para indicar términos concretos.'
+                                      +(' Avisos: '+'; '.join(failures[:2]) if failures else ''))
                     message(p,'system',op['notice']);op.update(searched=True,stage='model',iteration=1,inflight=False);checkpoint('search-result')
                     self.check();continue
                 p['run']['status']='modelo';op['inflight']=True;op['uncertain']=False;checkpoint('model-intent');self.emit('Desarrollando '+LABELS[op['task']['section']]+'…' if op.get('task') else 'Preparando el siguiente paso…')
@@ -345,11 +436,17 @@ class Agent:
                 # incluso cuando solo se enviarán los cambios a un hilo verificado.
                 full=context(p,user_text,allow_research and not op['searched'],op['notice'],origin,op.get('task'),material,allowed)
                 text=full
-                if not op.get('force_full') and conversation_state.can_increment(p,self.api):
+                if not op.get('force_full') and not op.get('loop') and conversation_state.can_increment(p,self.api):
                     delta=context_policy.incremental(full,p.get('copilot_ledger'))
                     if delta:text=delta
                 incremental=text is not full
-                self.api.instructions=incremental_instructions(op.get('task')) if incremental else instructions(op.get('task'))
+                if op.get('loop'):
+                    from agent_tools import TOOL_GUIDE
+                    st=op['loop']
+                    self.api.instructions=loop_instructions(TOOL_GUIDE,st['passes']+1,st['max_passes'],
+                        document.compact_state(p),st['receipt'],st['goal'])
+                else:
+                    self.api.instructions=incremental_instructions(op.get('task')) if incremental else instructions(op.get('task'))
                 received_ids={m['id'] for m in material}|set(json.loads(full).get('inherited_material_ids',[]))
                 p['last_context']={'characters':len(text),'full_characters':len(full),'mode':'incremental' if incremental else 'completo','instructions_characters':len(self.api.instructions),'material_fragments':len(material),'material_ids':sorted({m['id'] for m in material})}
                 payload=[{'role':'user','parts':[{'text':text}]}] if self.api.provider=='Gemini' and not getattr(self.api,'neutral',False) else [{'role':'user','content':text}]
@@ -364,13 +461,20 @@ class Agent:
                 self.check()
                 if calls:raise ValueError('El modelo intentó herramientas no disponibles. No se ejecutaron.')
                 raw=redact(raw)
-                try:r=unpack(raw,op.get('task'))
+                try:r=unpack(raw,op.get('task'),tools=bool(op.get('loop')))
                 except (ValueError,TypeError,KeyError) as e:
                     op['inflight']=False;p['run']={'status':'error_formato'}
-                    message(p,'system','La respuesta no cumple el formato académico ('+format_reason(e)+'). No se aplicó. Puedes elegir otro modelo y pulsar Reanudar.')
+                    if op.get('loop'):
+                        message(p,'system','El bucle no pudo interpretar la respuesta ('+format_reason(e)+'). No se aplicó ningún cambio en este paso. Puedes elegir otro modelo y pulsar Reanudar.')
+                    else:
+                        message(p,'system','La respuesta no cumple el formato académico ('+format_reason(e)+'). No se aplicó. Puedes elegir otro modelo y pulsar Reanudar.')
                     checkpoint('format-pending');return p
                 # Apply only a complete validated response while this operation is active.
                 before_drafts=dict(p['drafts'])
+                if op.get('loop'):
+                    if self._loop_pass(p,op,r,origin,user_text,received_ids):
+                        checkpoint('loop-pass');self.check();continue
+                    break
                 target=op.get('task',{}).get('section')
                 if target:
                     from autonomy import clean,protected,fingerprint
@@ -394,7 +498,7 @@ class Agent:
                     p['last_step']={'operation':op['id'],'section':target,'progress':progress,'reason':'Texto nuevo guardado en Apartados.' if progress else 'Sin avance verificable: el modelo no entregó un borrador nuevo utilizable para '+LABELS[target]+'. No se cambió ese apartado; revisa preguntas, datos y avisos.'}
                     message(p,'system',('Guardado en Apartados: '+LABELS[target]+'. No se modificó Word.') if progress else p['last_step']['reason'])
                 query=r.get('search')
-                if query and not op['searched'] and op['iteration']==0 and allow_research:
+                if query and not op['searched'] and allow_research:
                     op.update(stage='search',query=query);checkpoint('proposal-staged');self.check();continue
                 if target and not progress and not query and op['iteration']==0:
                     op.update(iteration=1,notice='El paso anterior no produjo un cambio verificable. Esta es la única corrección permitida: entrega en drafts el apartado work_order.section, con texto completo y útil; no repitas promesas. Si no es posible, explica qué información concreta lo bloquea.')

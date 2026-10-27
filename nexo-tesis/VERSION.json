@@ -192,7 +192,7 @@
     "files": 111,
     "runtime_only": true,
     "internal_sha256sums": true,
-    "tests_run_against_extracted_package": "369 passed / 2 skipped",
+    "tests_run_against_extracted_package": "416 passed / 2 skipped",
     "tk_interface_executed": false,
     "ready_to_use": {
       "quickstart": "LEER-PRIMERO.txt",
@@ -203,7 +203,7 @@
       "bundled_dependencies": "websocket-client and pypdf vendored in the package"
     },
     "self_check_branches_tested": "failure (Tk missing on Linux) and success (Tk simulated)",
-    "self_check_marker": "longdraft-1 + \"Borradores largos: OK\""
+    "self_check_marker": "agentloop-1 + \"Borradores largos: OK\" + \"Busqueda y plan: OK\" + \"Agente con herramientas: OK\""
   },
   "response_format": {
     "single_complete_json_object": true,
@@ -248,5 +248,15 @@
     "http_400_response_format_relaxed_once": true,
     "error_reason_redacted": true
   },
-  "build": "longdraft-1"
+  "agent_loop": {
+    "modules": ["document.py", "agent_tools.py"],
+    "max_passes": 12,
+    "max_tools_per_pass": 4,
+    "stop_reasons": ["finalizar", "pregunta", "sin_herramientas", "limite_de_pasos", "sin_progreso"],
+    "receipt": "last_loop + last 5 loop_receipts",
+    "document_exports": ["Markdown", "HTML", "OOXML DOCX (stdlib zipfile)"],
+    "word_modified_by_agent": false,
+    "research_report": "AGENTE-LOOP-Y-DOCUMENTO.md"
+  },
+  "build": "agentloop-1"
 }

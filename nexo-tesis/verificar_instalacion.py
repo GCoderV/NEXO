@@ -13,6 +13,7 @@ ROOT = Path(__file__).resolve().parent
 CORE = ('agent', 'autonomy', 'bibliography', 'config', 'context_policy',
         'conversation_state', 'copilot_metadata', 'copilot_socket', 'guide_rules',
         'materials', 'native_material', 'project_store', 'prompt_policy', 'providers',
+        'document', 'agent_tools',
         'routing', 'secrets_store', 'word_bridge', 'word_layout', 'pypdf', 'websocket')
 UI = ('app', 'material_dialog', 'settings_dialog', 'word_layout_dialog')
 
@@ -56,6 +57,107 @@ def check_long_draft():
     if (len(drafts) != 1 or drafts[0]['section'] != 'marco_teorico'
             or len(drafts[0]['text']) <= 10000):
         return ['Esta copia sigue rechazando borradores largos: descarga el ZIP nuevo y descomprímelo en una carpeta vacía.']
+    return []
+
+
+def check_research():
+    """Functional proof that THIS copy executes long searches and keeps planning.
+
+    The dead end was caused by a 250-character cap on `search.query` (which
+    rejected the model's boolean query before Crossref) and by a planner that
+    dropped optional sections. No network is used here: only normalization,
+    validation and planning are exercised.
+    """
+    import json
+    from agent import unpack
+    from autonomy import plan
+    from bibliography import normalize_queries
+    query = ('"cooperative learning" AND "role play" AND "English as a foreign language" '
+             'AND ("secondary education" OR "high school") AND ("speaking" OR "oral production" '
+             'OR "oral communication" OR "speaking skills" OR "English speaking") AND '
+             '("academic achievement" OR "learning outcomes" OR "language learning" OR '
+             '"speaking performance" OR "language proficiency") AND '
+             '("2020" OR "2021" OR "2022" OR "2023" OR "2024" OR "2025")')
+    queries = normalize_queries(query)
+    if not (2 <= len(queries) <= 3) or any(not 2 <= len(q) <= 250 for q in queries):
+        return ['Esta copia no divide las consultas largas: descarga el ZIP nuevo.']
+    result = unpack(json.dumps({'reply': 'ok', 'search': {'query': query,
+                    'reason': 'Antecedentes'}}, ensure_ascii=False))
+    if result['search']['query'] != query:
+        return ['Esta copia sigue rechazando consultas bibliograficas largas.']
+    project = {'topic': 'Tema', 'topic_pending': False, 'facts': {}, 'drafts': {},
+               'sources': [], 'data_ready': False, 'materials': [],
+               'format_profile': None, 'guide': None}
+    tasks, _notice = plan(project, True)
+    if not {'cronograma', 'presupuesto', 'anexos'} <= {t['section'] for t in tasks}:
+        return ['Esta copia sigue declarando que no hay tareas con apartados pendientes.']
+    return []
+
+
+def check_loop():
+    """Functional proof of the bounded tool loop, offline, with a stub model.
+
+    If the user opened an older folder, `Agent.turn(..., loop=...)` or the new
+    modules would fail. This exercises inspect -> write -> export -> finalize
+    and validates the generated OOXML package without Word or network.
+    """
+    import io
+    import json
+    import tempfile
+    import zipfile
+    from pathlib import Path
+    from agent import Agent
+    from project_store import ProjectStore
+
+    def response(text, calls, done=False):
+        return json.dumps({'reply': text, 'tool_calls': [
+            {'name': name, 'arguments': args} for name, args in calls], 'done': done},
+            ensure_ascii=False)
+
+    class StubAPI:
+        provider = 'verificacion-local'
+        model = 'sin-red'
+        key = ''
+        endpoint = ''
+        last_usage = {}
+
+        def __init__(self):
+            self.requests = []
+            self.instructions = ''
+
+        def request(self, conversation, declarations):
+            self.requests.append(conversation)
+            step = len(self.requests)
+            if step == 1:
+                raw = response('Reviso', [('ver_documento', {})])
+            elif step == 2:
+                raw = response('Escribo', [('escribir_apartado', {
+                    'section': 'delimitacion', 'text': 'Borrador de comprobacion.', 'sources': []})])
+            else:
+                raw = response('Genero', [('generar_documento', {}),
+                                          ('finalizar', {'motivo': 'Comprobacion completada'})], True)
+            return {}, raw, []
+
+    with tempfile.TemporaryDirectory() as data, tempfile.TemporaryDirectory() as out:
+        store = ProjectStore(data)
+        project = store.create('Tema de comprobacion local')
+        api = StubAPI()
+        result = Agent(store, api, lambda *a: True, lambda q: []).turn(
+            project['id'], 'Comprueba el bucle', origin='usuario',
+            loop={'goal': 'Comprueba el bucle', 'max_passes': 4,
+                  'allow_export': True, 'export_dir': out})
+        if len(api.requests) != 3:
+            return ['El bucle del agente no completo sus tres pasos acotados.']
+        if 'Borrador de comprobacion' not in result.get('drafts', {}).get('delimitacion', {}).get('text', ''):
+            return ['Las herramientas del agente no pudieron escribir un apartado.']
+        if result.get('last_loop', {}).get('stopped') != 'finalizado':
+            return ['El agente no emitio un recibo de parada verificable.']
+        files = sorted(Path(out).glob('*.docx'))
+        if not files:
+            return ['No se genero el documento DOCX completo.']
+        with zipfile.ZipFile(io.BytesIO(files[0].read_bytes())) as z:
+            if z.testzip() is not None or 'word/document.xml' not in z.namelist():
+                return ['El DOCX generado no es un paquete OOXML valido.']
     return []
 
 
@@ -119,6 +221,24 @@ def main():
         else:
             from limits import MAX_DRAFT_CHARS
             print('Borradores largos: OK (hasta ' + str(MAX_DRAFT_CHARS) + ' caracteres).')
+    try:
+        research_issues = check_research()
+    except Exception as e:
+        problems.append('No se pudo comprobar busqueda y plan: ' + type(e).__name__ + ' ' + str(e)[:100])
+    else:
+        if research_issues:
+            problems += research_issues
+        else:
+            print('Busqueda y plan: OK (consultas largas + apartados pendientes).')
+    try:
+        loop_issues = check_loop()
+    except Exception as e:
+        problems.append('No se pudo comprobar el agente con herramientas: ' + type(e).__name__ + ' ' + str(e)[:100])
+    else:
+        if loop_issues:
+            problems += loop_issues
+        else:
+            print('Agente con herramientas: OK (inspeccionar, escribir, exportar, recibo).')
     if problems:
         print('')
         print('PROBLEMAS ENCONTRADOS:')

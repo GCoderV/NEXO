@@ -52,9 +52,30 @@ Las librerías `websocket` y `pypdf` ya vienen incluidas: no hay que instalar na
   alias en español y fuentes irregulares, y prompt que informa del límite.
   También se curan automáticamente el 404 de modelo Gemini obsoleto y el 400
   por `response_format`, con una sola repetición segura en cada caso.
-- El verificador de arranque muestra `(longdraft-1)` y comprueba de
-  forma funcional que un borrador de más de 10 000 caracteres se acepta.
-- Pruebas locales: 369 superadas / 2 omitidas con fixtures sintéticas.
+- Corregido el punto muerto de la investigación: las consultas booleanas
+  largas (340-414 caracteres) ya NO se rechazan; se normalizan en un máximo de
+  3 consultas simples, se aprueban y se ejecutan realmente en Crossref. Nuevo
+  botón «Buscar fuentes» para buscar sin esperar a que el modelo lo proponga.
+- Corregido el planificador: un borrador de Metodología desbloquea Instrumentos;
+  Cronograma, Presupuesto y Anexos se generan como PLANTILLAS con «Por definir»
+  (no se inventan fechas ni importes); el aviso indica qué falta y cómo
+  desbloquearlo; Antecedentes se exige dentro del Marco teórico.
+- NUEVO: **agente con herramientas** en modo bucle acotado (2-12 pasos, máximo 4
+  herramientas por paso, recibo auditable). 15 herramientas para inspeccionar el
+  documento, buscar fuentes, escribir o EDITAR solo la parte que falta, AÑADIR o
+  QUITAR apartados (sin borrar su borrador), registrar datos con evidencia y
+  generar el documento completo. Ver AGENTE-LOOP-Y-DOCUMENTO.md.
+- NUEVO: pestaña «Documento» y **«Generar documento completo»**: exporta
+  Markdown, HTML y un DOCX OOXML estándar sin Word, sin internet y sin
+  dependencias. Los apartados pendientes se marcan «Por redactar»; no se
+  inventa contenido, autoría, año, DOI ni resultados.
+- Idea de diseño tomada de proyectos abiertos (DoThesis, Loopy,
+  agentic-thesis-writing, Academic Writing Toolkit): una sola vía de escritura,
+  pasos acotados con comprobación y recibo, y aprobación humana antes de actuar.
+- El verificador de arranque muestra `(agentloop-1)` y comprueba de forma
+  funcional: borradores >10 000 caracteres, consultas largas + planificador y
+  un bucle completo de agente con exportación, TODO sin red.
+- Pruebas locales: 416 superadas / 2 omitidas con fixtures sintéticas.
 - **NO verificado**: sesión real de Copilot, recuerdo del servidor, Word COM,
   DPAPI, PowerShell de Windows ni la interfaz Tk en este entorno.
 - La cabecera `X-RoutingParameter-SessionKey` es evidencia de terceros sin
@@ -76,7 +97,8 @@ FORBIDDEN_PREFIXES = ('tests/', 'reports/', '__pycache__/', 'copilot-login/', 'm
 FORBIDDEN_NAMES = ('.gitignore', '.env', 'config.json', 'preferences.json',
                    'projects.sqlite3', 'SHA256SUMS.txt')
 # Conveniencias de "listo para usar" añadidas en 0.4.1-dev.
-READY_EXTRAS = ('LEER-PRIMERO.txt', 'VERIFICAR.cmd', 'verificar_instalacion.py', 'version.py', 'limits.py')
+READY_EXTRAS = ('LEER-PRIMERO.txt', 'VERIFICAR.cmd', 'verificar_instalacion.py',
+                'version.py', 'limits.py', 'document.py', 'agent_tools.py')
 
 
 def runtime_paths():
@@ -105,6 +127,8 @@ def build():
         ROOT / 'contexto' / 'CONTINUIDAD-COPILOT-IMPLEMENTACION.md').read_bytes()
     entries['INCIDENCIA-FORMATO-BORRADOR.md'] = (
         ROOT / 'contexto' / 'INCIDENCIA-FORMATO-BORRADOR.md').read_bytes()
+    entries['AGENTE-LOOP-Y-DOCUMENTO.md'] = (
+        ROOT / 'contexto' / 'AGENTE-LOOP-Y-DOCUMENTO.md').read_bytes()
     manifest = ''.join(
         hashlib.sha256(entries[rel]).hexdigest() + '  ' + rel + '\n'
         for rel in sorted(entries))
