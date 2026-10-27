@@ -10,6 +10,7 @@ import unicodedata
 from limits import MAX_RESPONSE_CHARS, MAX_DRAFT_CHARS, MAX_REPLY_CHARS
 from project_store import FACT_KEYS, SECTIONS, LABELS, now, message, set_fact
 import bibliography
+import diagnostics
 import document
 import context_policy
 import conversation_state
@@ -284,26 +285,60 @@ class Agent:
     def __init__(self,store,api,approve_search=None,searcher=None,stop=None,emit=None):
         self.store=store;self.api=api;self.approve_search=approve_search;self.searcher=searcher or bibliography.search;self.stop=stop or threading.Event();self.emit=emit or (lambda text:None)
     def _loop_pass(self,p,op,r,origin,user_text,received_ids):
-        """Execute one bounded pass and decide whether another pass is justified.
-
-        Returns False when the loop must stop. Stops on: explicit finalizar, a
-        question to the user, no tool calls, exhausted passes, or no measurable
-        progress after two consecutive passes. Leaves an auditable receipt.
+        """One pass. Bounded mode keeps the old contract; continuous mode has
+        NO step quota and repeats until `project_state.verify()` says done.
         """
         import agent_tools
+        import run_loop
+        import time
         state=op['loop'];state['passes']+=1
+        profile=None
+        continuous=bool(state.get('continuous'))
+        state.setdefault('started_at',time.monotonic())
+        state.setdefault('research_rounds',0)
         calls=r.get('tool_calls',[])
+        quota=state.get('max_passes')
+        label=('continuo · paso '+str(state['passes'])) if continuous else \
+              ('paso '+str(state['passes'])+'/'+str(quota))
         services={'searcher':self.searcher,'approve_search':self.approve_search,
                   'allow_research':state.get('allow_research',False),
                   'allow_export':state.get('allow_export',False),
                   'export_dir':state.get('export_dir',''),
-                  'origin':origin,'user_text':user_text,
+                  'origin':origin,'user_text':user_text,'emit':self.emit,
+                  'include_optional':state.get('include_optional',True),
+                  'allow_network':state.get('allow_network',True),
                   'producer':str(getattr(self.api,'provider','agente'))+':'+str(getattr(self.api,'model','')),
                   'store':self.store}
+
+        # HOST-DRIVEN RESEARCH: the loop investigates in place instead of
+        # waiting for the model to promise a search. Human approves the exact
+        # queries. Bounded to 3 rounds so an offline machine cannot spin.
+        if (continuous and state.get('auto_research') and state.get('allow_research')
+                and self.approve_search is not None and not p.get('sources')
+                and state['research_rounds']<3
+                and (state['passes']==1 or state['passes']%4==0)):
+            state['research_rounds']+=1
+            try:
+                import research
+                self.emit('Investigación automática en sitio · ronda '+str(state['research_rounds']))
+                outcome=research.research_for(
+                    p,approve=lambda qs:self.approve_search('; '.join(qs),'Investigación automática del agente continuo'),
+                    on_event=self.emit,allow_network=True,max_queries=3,deadline_s=40)
+                state['actions'].append({'pass':state['passes'],'tool':'investigar',
+                    'ok':bool(outcome.get('ok')),'changed':bool(outcome.get('added')),
+                    'summary':('Investigación: '+str(outcome.get('added',0))+' fuentes, '+
+                               str(outcome.get('verified',0))+' verificadas en 2+ bases. '+
+                               str(outcome.get('attempted',0))+' consultas. '+
+                               '; '.join(outcome.get('errors',[])[:2]))[:400]})
+                if outcome.get('added'):state['changed']+=1
+            except Exception as exc:
+                state['actions'].append({'pass':state['passes'],'tool':'investigar','ok':False,
+                    'changed':False,'summary':'Investigación contenida: '+type(exc).__name__})
+
         results=[];stop=None
         for call in calls:
             self.check()
-            self.emit('Agente · paso '+str(state['passes'])+'/'+str(state['max_passes'])+' · '+call['name'])
+            self.emit('Agente · '+label+' · '+call['name'])
             row=agent_tools.execute(p,call,services)
             results.append(row)
             if len(results)<=12:
@@ -312,14 +347,13 @@ class Agent:
                                          'summary':row['summary'][:300]})
             if row['changed']:state['changed']+=1
             if row['stop'] and not stop:stop=row['stop']
-        state['actions']=state['actions'][-80:]
+        state['actions']=state['actions'][-100:]
         receipt='\n'.join(agent_tools.receipt_line(row) for row in results)[:3000]
         state['receipt']=receipt;op['notice']=receipt
         op['inflight']=False;op['uncertain']=False
         message(p,'assistant',r['reply'])
-        message(p,'system','Paso '+str(state['passes'])+'/'+str(state['max_passes'])+' · '+(receipt or 'Sin acciones.'))
-        if r.get('done'):stop=stop or 'finalizado'
-        if not calls:stop=stop or 'sin_herramientas'
+        message(p,'system',label+' · '+(receipt or 'Sin acciones.'))
+
         current=document.compact_state(p)
         signature=json.dumps({k:current[k] for k in ('with_draft','missing','needs_revision','hidden','sources')},
                              sort_keys=True,ensure_ascii=False)
@@ -329,14 +363,43 @@ class Agent:
         else:
             state['stalls']=0
         state['signature']=signature
-        if not stop and state['stalls']>=2:stop='sin_progreso'
-        if not stop and state['passes']>=state['max_passes']:stop='limite_de_pasos'
+
+        if continuous:
+            # A model claiming "listo" is NOT completion. Only the deterministic
+            # acceptance check ends the loop. Human questions still stop it.
+            if stop=='pregunta':pass
+            else:stop=None
+            if r.get('done'):state['actions'].append({'pass':state['passes'],'tool':'verificacion',
+                'ok':True,'changed':False,'summary':'El modelo dijo "listo"; se comprobó el estado real.'})
+            profile=run_loop.RunProfile(
+                goal=state['goal'],max_passes=None,
+                max_seconds=state['max_seconds'],max_stalls=state['max_stalls'],
+                hard_fuse=state['hard_fuse'],allow_research=state['allow_research'],
+                allow_export=state['allow_export'],include_optional=state['include_optional'],
+                required_modules=tuple(state['required_modules']),
+                export_dir=state['export_dir'],producer=state['producer'])
+            decision=run_loop.evaluate(p,state,profile,now_monotonic=time.monotonic())
+            state['verification']=decision['verification']
+            if decision['stop']:stop=decision['stop']
+            elif decision['nudge']:
+                op['notice']=(receipt+'\n\nESTRATEGIA '+str(state['stalls'])+':\n'+decision['nudge'])[:4000]
+                state['receipt']=op['notice']
+        else:
+            if r.get('done'):stop=stop or 'finalizado'
+            if not calls:stop=stop or 'sin_herramientas'
+            if not stop and state['stalls']>=2:stop='sin_progreso'
+            if not stop and quota and state['passes']>=quota:stop='limite_de_pasos'
+
         p['last_step']={'operation':op['id'],'progress':state['changed']>0,'reason':receipt[:300]}
         if stop:
             state['reason']=stop
-            p['last_loop']={'goal':state['goal'],'passes':state['passes'],
-                            'changes':state['changed'],'stopped':stop,
-                            'actions':state['actions'][-40:],'state':current,'time':now()}
+            if continuous:
+                profile=profile or run_loop.RunProfile(goal=state['goal'])
+                p['last_loop']=run_loop.receipt(p,state,profile,stop)
+            else:
+                p['last_loop']={'goal':state['goal'],'passes':state['passes'],
+                                'changes':state['changed'],'stopped':stop,
+                                'actions':state['actions'][-40:],'state':current,'time':now()}
             receipts=p.setdefault('loop_receipts',[])
             receipts.append(p['last_loop']);del receipts[:-5]
             message(p,'system','Bucle detenido ('+stop+'). '+str(state['changed'])+
@@ -347,6 +410,18 @@ class Agent:
     def check(self):
         if self.stop.is_set():raise Stopped('Detenido. No se iniciarán más solicitudes; lo ya guardado permanece.')
     def turn(self,project_id,user_text='',allow_research=False,origin='usuario',resume=False,refresh_context=False,task=None,loop=None):
+        # Fase 0: `pending()` and all preparation used to run BEFORE the inner
+        # try. A single malformed config value escaped as a raw interpreter
+        # message in a Tk modal. Log every escape, then re-raise unchanged so
+        # existing callers and tests keep their contracts.
+        try:
+            return self._turn(project_id,user_text,allow_research,origin,resume,refresh_context,task,loop)
+        except Exception as e:
+            diagnostics.log_exception(e,e.__traceback__,
+                {'origin':'Agent.turn','project':str(project_id)[:80],'loop':bool(loop)},
+                getattr(getattr(self.api,'config',None),'redact',None) and self.api.config or None)
+            raise
+    def _turn(self,project_id,user_text='',allow_research=False,origin='usuario',resume=False,refresh_context=False,task=None,loop=None):
         p=self.store.load(project_id);self.store.recover(p)
         decision=conversation_state.pending(p,self.api)
         if decision:raise conversation_state.ContinuityPending(decision['message'])
@@ -376,10 +451,20 @@ class Agent:
                 from autonomy import order
                 op['task']=order(p,task)
             if loop:
+                raw_max=loop.get('max_passes',None if loop.get('continuous') else 6)
+                quota=None if raw_max is None else max(1,min(int(raw_max),12))
+                import time as _time
                 op['loop']={'goal':str(loop.get('goal') or user_text)[:2000],
-                            'max_passes':max(1,min(int(loop.get('max_passes',6)),12)),
-                            'passes':0,'receipt':'','reason':'','actions':[],'changed':0,
-                            'stalls':0,'signature':'',
+                            'max_passes':quota,'passes':0,'receipt':'','reason':'',
+                            'actions':[],'changed':0,'stalls':0,'signature':'',
+                            'continuous':bool(loop.get('continuous',False)),
+                            'max_seconds':max(60,min(int(loop.get('max_seconds',3600)),86400)),
+                            'max_stalls':max(2,min(int(loop.get('max_stalls',10)),40)),
+                            'hard_fuse':max(2,min(int(loop.get('hard_fuse',300)),1000)),
+                            'auto_research':bool(loop.get('auto_research',False)),
+                            'include_optional':bool(loop.get('include_optional',True)),
+                            'required_modules':list(loop.get('required_modules') or ('M1','M2','M3','M4','M5')),
+                            'started_at':_time.monotonic(),'research_rounds':0,
                             'allow_research':bool(loop.get('allow_research',allow_research)),
                             'allow_export':bool(loop.get('allow_export',False)),
                             'export_dir':str(loop.get('export_dir') or ''),
@@ -444,7 +529,8 @@ class Agent:
                     from agent_tools import TOOL_GUIDE
                     st=op['loop']
                     self.api.instructions=loop_instructions(TOOL_GUIDE,st['passes']+1,st['max_passes'],
-                        document.compact_state(p),st['receipt'],st['goal'])
+                        document.compact_state(p),st['receipt'],st['goal'],
+                        continuous=bool(st.get('continuous')))
                 else:
                     self.api.instructions=incremental_instructions(op.get('task')) if incremental else instructions(op.get('task'))
                 received_ids={m['id'] for m in material}|set(json.loads(full).get('inherited_material_ids',[]))

@@ -11,6 +11,9 @@ from tkinter.scrolledtext import ScrolledText
 from project_store import ProjectStore, FACT_KEYS, SECTIONS, LABELS, message, set_fact, invalidate, export_markdown, now
 from version import VERSION
 import document
+import diagnostics
+import run_loop
+import project_state
 from config import Config
 from providers import PROVIDERS
 from agent import Agent
@@ -29,8 +32,9 @@ class Application:
         self.root=root;self.store=store or ProjectStore();self.config=config or Config(self.store.root)
         self.api_factory=api_factory or self.config.api;self.searcher=searcher;self.word_factory=word_factory or WordBridge
         self.project=None;self.bridge=None;self.busy=False;self.stop=threading.Event();self.events=queue.Queue();self.controls=[];self.inputs=[];self.project_ids=[];self.consent=set();self.documents=[];self.word_origin=None;self.input_origin='usuario';self.pending_user_text=None
-        self.allow_research=tk.BooleanVar(value=False);self.include_optional=tk.BooleanVar(value=True);self.loop_passes=tk.StringVar(value='6');self.status=tk.StringVar(value='Crea un proyecto con un tema. Tu información no se comparte entre proyectos.')
+        self.allow_research=tk.BooleanVar(value=False);self.include_optional=tk.BooleanVar(value=True);self.loop_passes=tk.StringVar(value='6');self.continuous_research=tk.BooleanVar(value=True);self.continuous_minutes=tk.StringVar(value='60');self.status=tk.StringVar(value='Crea un proyecto con un tema. Tu información no se comparte entre proyectos.')
         root.title('Nexo Tesis · agente académico independiente');root.geometry('1040x750');root.minsize(740,560);root.configure(bg=BG)
+        diagnostics.wrap_excepthook(self.config)
         self.styles();root.columnconfigure(1,weight=1);root.rowconfigure(1,weight=1)
         header=ttk.Frame(root,padding=(20,14));header.grid(row=0,column=0,columnspan=2,sticky='ew');header.columnconfigure(0,weight=1)
         brand=ttk.Frame(header);brand.grid(row=0,column=0,sticky='w');ttk.Label(brand,text='nexo',style='Brand.TLabel').pack(side='left');ttk.Label(brand,text='  TESIS',style='Kicker.TLabel').pack(side='left',pady=(6,0))
@@ -66,10 +70,23 @@ class Application:
         try:return fn()
         except Exception as e:self.show_error(e)
     def show_error(self,e):
-        text=str(e)
-        text=self.config.redact(text)
-        messagebox.showerror('Nexo Tesis',text,parent=self.root)
-    def error_callback(self,kind,error,tb):self.show_error(error)
+        path,_record=diagnostics.log_exception(e,getattr(e,'__traceback__',None),
+            {'origin':'show_error','action':getattr(self,'last_action','')},self.config)
+        messagebox.showerror('Nexo Tesis',diagnostics.friendly(e,path,self.config),parent=self.root)
+    def error_callback(self,kind,error,tb):
+        path,_record=diagnostics.log_exception(error,tb,
+            {'origin':'tk_callback','action':getattr(self,'last_action','')},self.config)
+        try:messagebox.showerror('Nexo Tesis',diagnostics.friendly(error,path,self.config),parent=self.root)
+        except Exception:pass
+    def copy_diagnostic(self):
+        records=diagnostics.recent(1)
+        if not records:messagebox.showinfo('Diagnóstico','No hay errores registrados en esta sesión.',parent=self.root);return
+        text=json.dumps(records[0],ensure_ascii=False,indent=2)
+        self.root.clipboard_clear();self.root.clipboard_append(text)
+        folder=diagnostics.log_dir()
+        files=sorted(folder.glob('error-*.json'),key=lambda f:f.stat().st_mtime,reverse=True)
+        self.status.set('Diagnóstico copiado ('+str(len(text))+' caracteres). Archivo: '+str(files[0]) if files else 'Diagnóstico copiado.')
+        messagebox.showinfo('Diagnóstico copiado','Se copió un registro sin contenido de tu tesis, claves ni tokens. Puedes pegarlo donde lo necesites. No se envió nada a Internet.',parent=self.root)
     def button(self,parent,text,command,accent=False):
         b=ttk.Button(parent,text=text,command=lambda:self.guard(command),style='Accent.TButton' if accent else 'TButton');self.controls.append(b);return b
     def tab(self,name):
@@ -123,6 +140,9 @@ class Application:
         self.button(auto,'Agente con herramientas',self.start_agent_loop,True).pack(side='left',padx=(10,0))
         ttk.Label(auto,text='Pasos:').pack(side='left',padx=(6,2))
         passes=ttk.Combobox(auto,textvariable=self.loop_passes,values=('2','4','6','8','12'),width=3,state='readonly');passes.pack(side='left');self.controls.append(passes)
+        research_auto=ttk.Checkbutton(auto,text='Investigación automática',variable=self.continuous_research);research_auto.pack(side='left',padx=(8,2));self.controls.append(research_auto)
+        ttk.Label(auto,text='Tiempo máx. (min):').pack(side='left',padx=(6,2))
+        minutes=ttk.Combobox(auto,textvariable=self.continuous_minutes,values=('15','30','60','120'),width=4,state='readonly');minutes.pack(side='left');self.controls.append(minutes)
         ttk.Label(auto,text='Máx. apartados:').pack(side='left',padx=(8,4))
         self.auto_limit=tk.StringVar(value='6');limit=ttk.Combobox(auto,textvariable=self.auto_limit,values=('2','4','6','8','12'),width=3,state='readonly');limit.pack(side='left');self.controls.append(limit)
         ttk.Label(auto,text='Se guarda cada avance · Word requiere aprobación',style='Muted.TLabel',wraplength=160).pack(side='left',padx=6)
@@ -156,12 +176,18 @@ class Application:
         row=ttk.Frame(f);row.grid(row=2,column=0,sticky='ew')
         self.button(row,'Generar documento completo',self.generate_document,True).pack(side='left')
         self.button(row,'Completar lo que falta',lambda:self.start_agent_loop(DEFAULT_LOOP_GOAL)).pack(side='left',padx=4)
+        self.button(row,'Agente continuo · hasta terminar',self.start_continuous,True).pack(side='left',padx=4)
         row2=ttk.Frame(f);row2.grid(row=3,column=0,sticky='ew',pady=(6,0))
         self.button(row2,'Añadir apartado',self.doc_add_section).pack(side='left')
         self.button(row2,'Quitar / restaurar',self.doc_toggle_section).pack(side='left',padx=4)
         self.button(row2,'Ver recibo del agente',self.show_loop_receipt).pack(side='left',padx=4)
+        self.button(row2,'Copiar diagnóstico',self.copy_diagnostic).pack(side='left',padx=4)
+        self.button(row2,'Confirmar módulo',self.confirm_module_dialog).pack(side='left',padx=4)
+        self.button(row2,'Deshacer último cambio',self.undo_commit).pack(side='left',padx=4)
+        self.module_status=ttk.Label(f,text='MÓDULOS: abre un proyecto.',style='Kicker.TLabel',wraplength=680)
+        self.module_status.grid(row=4,column=0,sticky='w',pady=(10,0))
         self.doc_status=ttk.Label(f,text='',style='Muted.TLabel',wraplength=680)
-        self.doc_status.grid(row=4,column=0,sticky='w',pady=(8,0))
+        self.doc_status.grid(row=5,column=0,sticky='w',pady=(6,0))
     def refresh_document(self):
         if not hasattr(self,'doc_tree'):return
         self.doc_tree.delete(*self.doc_tree.get_children())
@@ -169,8 +195,15 @@ class Application:
         for e in document.outline(self.project):
             state=e['status'] if e['has_draft'] else 'sin borrador'
             self.doc_tree.insert('','end',iid=e['key'],values=(e['label'],state,e['chars'],'sí' if e['visible'] else 'no'))
+        status=project_state.status_map(self.project)
+        verification=project_state.verify(self.project) if self.project else None
+        self.module_status.configure(text='MÓDULOS  '+'   '.join(
+            m+' '+project_state.MODULE_LABELS[m].split()[0]+': '+status[m] for m in status)
+            + ('   ·   VERIFICACIÓN: '+('TERMINADO' if verification and verification['done'] else 'PENDIENTE')
+               if verification else ''))
         last=self.project.get('last_loop')
-        if last:self.doc_status.configure(text='Último agente: '+str(last['passes'])+' pasos · '+str(last['changes'])+' cambios · motivo: '+last['stopped'])
+        if last:self.doc_status.configure(text='Último agente: '+str(last.get('passes',0))+' pasos · '+str(last.get('changes',0))+' cambios · motivo: '+str(last.get('stopped','?'))+
+            (' · ' + str(last.get('verification',{}).get('score','')) + '/100' if last.get('verification') else ''))
     def generate_document(self):
         self.require_project();self.ensure_clean_draft()
         folder=filedialog.askdirectory(parent=self.root,title='Carpeta donde guardar el documento completo')
@@ -203,11 +236,89 @@ class Application:
         if not last:messagebox.showinfo('Recibo del agente','Todavía no se ha ejecutado un agente con herramientas en este proyecto.',parent=self.root);return
         win=tk.Toplevel(self.root);win.title('Recibo del agente');win.geometry('760x560');win.transient(self.root)
         text=self.textbox(win,22,True);text.pack(fill='both',expand=True,padx=10,pady=10)
-        lines=['OBJETIVO: '+last['goal'],'PASOS: '+str(last['passes'])+' · CAMBIOS: '+str(last['changes'])+' · MOTIVO DE PARADA: '+last['stopped'],'']
+        lines=['OBJETIVO: '+str(last.get('goal','')),
+               'PASOS: '+str(last.get('passes',0))+' · CAMBIOS: '+str(last.get('changes',0))+
+               ' · INVESTIGACIONES: '+str(last.get('research_rounds',0))+
+               ' · MOTIVO DE PARADA: '+str(last.get('stopped','?')),'']
+        verification=last.get('verification') or {}
+        if verification:
+            lines += ['VERIFICACIÓN: '+('TERMINADO' if verification.get('done') else 'PENDIENTE')+
+                      ' · PUNTUACIÓN: '+str(verification.get('score','?'))+'/100',
+                      'MÓDULOS: '+json.dumps(verification.get('status',{}),ensure_ascii=False),
+                      'BLOQUEOS: '+'; '.join(verification.get('blocked',[])[:5]),'']
+        if last.get('profile'):
+            lines += ['PERFIL: sin cuota de pasos · '+str(last['profile'].get('max_seconds',0)//60)+
+                      ' min · '+str(last['profile'].get('hard_fuse',0))+' llamadas de fusible','']
         lines += ['PASO '+str(a['pass'])+' · '+('OK' if a['ok'] else 'FALLO')+' · '+a['tool']+' → '+a['summary'] for a in last['actions']]
-        lines += ['','ESTADO FINAL DEL DOCUMENTO','Con borrador: '+str(last['state']['with_draft'])+'/'+str(last['state']['sections']),'Fuentes: '+str(last['state']['sources'])]
-        lines += ['Huecos:']+['• '+g for g in last['state']['gaps']]
+        final=last.get('state') or {}
+        lines += ['','ESTADO FINAL','Apartados: '+str(final.get('sections',0))+
+                  ' · Fuentes: '+str(final.get('sources',0))+
+                  ' · Módulos: '+json.dumps(final.get('modules',{}),ensure_ascii=False)]
         self.put(text,'\n'.join(lines),True)
+    def confirm_module_dialog(self):
+        self.require_project();self.ensure_clean_draft()
+        values=['M1 · Tema','M2 · Fuentes','M3 · Diseño','M4 · Datos','M5 · Escritura']
+        win=tk.Toplevel(self.root);win.title('Confirmar módulo');win.geometry('420x180');win.transient(self.root);win.grab_set()
+        choice=tk.StringVar(value=values[0])
+        ttk.Label(win,text='Solo tú puedes dar por terminado un módulo. Se requiere contenido real.',wraplength=380).pack(padx=14,pady=(14,6))
+        combo=ttk.Combobox(win,textvariable=choice,values=values,state='readonly');combo.pack(padx=14,fill='x')
+        def apply():
+            try:
+                module=choice.get().split(' ')[0]
+                project_state.confirm_module(self.project,module,'usuario')
+                self.store.save(self.project,'module-confirmed');self.render()
+                self.status.set('Módulo '+module+' confirmado por ti.');win.destroy()
+            except Exception as e:self.show_error(e)
+        try:
+            ttk.Button(win,text='Confirmar',command=apply).pack(pady=14)
+        finally:
+            pass
+    def undo_commit(self):
+        self.require_project();self.ensure_clean_draft()
+        try:
+            result=project_state.undo_last(self.project)
+            if not result.get('ok'):self.status.set(result.get('reason','Nada que deshacer.'));return
+            self.store.save(self.project,'commit-undone');self.render()
+            self.status.set('Se restauraron: '+', '.join(result.get('restored',[])))
+        except Exception as e:self.show_error(e)
+    def start_continuous(self):
+        """Fase 2/5: no step quota; repeats until verification says done."""
+        self.require_project();self.ensure_clean_draft()
+        if self.busy:return
+        if self.project.get('pending'):raise ValueError('Hay una petición pendiente. Usa Reanudar antes de iniciar otro agente.')
+        try:minutes=max(5,min(int(self.continuous_minutes.get()),240))
+        except (ValueError,TypeError):minutes=60
+        research=bool(self.continuous_research.get() or self.allow_research.get())
+        docs=str(Path.home()/'.nexo-tesis'/'documentos')
+        profile=run_loop.RunProfile(
+            goal=('Completa TODO el trabajo de tesis: investiga fuentes verificables en sitio, '
+                  'redacta y edita cada apartado pendiente, corrige las puertas duras, genera el '
+                  'documento completo y repite el ciclo hasta que verificar() indique done=true. '
+                  'No inventes fuentes, autores, años, DOI ni resultados.'),
+            max_passes=None,max_seconds=minutes*60,max_stalls=10,hard_fuse=300,
+            allow_research=research,auto_research=research,allow_export=True,
+            include_optional=True,export_dir=docs,producer='agente-continuo')
+        state=run_loop.evaluate(self.project,{'passes':0,'stalls':0},profile)['verification']
+        text=('AGENTE CONTINUO · SIN CUOTA DE PASOS\n\n'
+              +profile.describe()+'\n\n'
+              'El bucle repetirá: inspeccionar → investigar en sitio → escribir/editar → '
+              'verificar. Se detiene SOLO cuando la verificación determina que el trabajo está '
+              'terminado, cuando tú pulsas Detener, o por un tope de seguridad.\n\n'
+              'Estado inicial: '+('TERMINADO' if state['done'] else str(len(state['missing']))+
+              ' pendientes · '+str(len(state['blocked']))+' bloqueos · puntuación '+str(state['score'])+'/100')+'.\n'
+              'Investigación externa: '+('AUTORIZADA (verás cada consulta antes de enviarla)' if research else 'DESACTIVADA')+'.\n'
+              'Carpeta de documentos: '+docs+'\n\n'
+              'Las consultas exactas se aprobarán una por una. No se modifica Word. '
+              'Los apartados aprobados o editados por ti están protegidos. ¿Iniciar?')
+        if not messagebox.askyesno('Agente continuo · aprobar conjunto',text,parent=self.root):return
+        api=self.api_factory()
+        if not self.authorize(api):return
+        from agent import Agent
+        id=self.project['id'];self.stop.clear();self.pending_user_text=None
+        worker=Agent(self.store,api,self.ask_search,self.searcher,self.stop,lambda s:self.events.put(('status',s)))
+        self.run_job(lambda:worker.turn(id,profile.goal,allow_research=research,
+                                        origin='usuario',loop=profile.loop_config()),
+                     lambda result:self.finish_turn(id,result),research=research)
     def start_agent_loop(self,goal=None):
         """Bounded tool-using loop: the user approves the exact goal and limits."""
         self.require_project();self.ensure_clean_draft()
@@ -515,7 +626,9 @@ class Application:
         self.allow_research_value=research;self.set_busy(True);self.status.set('Operación en curso…')
         def thread():
             try:self.events.put(('done',done,work(),None))
-            except Exception as e:self.events.put(('done',done,None,e))
+            except Exception as e:
+                diagnostics.log_exception(e,e.__traceback__,{'origin':'run_job'},self.config)
+                self.events.put(('done',done,None,e))
         threading.Thread(target=thread,daemon=True).start()
     def poll(self):
         try:
@@ -532,6 +645,7 @@ class Application:
                 elif item[0]=='done':
                     _,done,result,error=item;self.set_busy(False)
                     if error:
+                        diagnostics.log_exception(error,getattr(error,'__traceback__',None),{'origin':'poll'},self.config)
                         if self.pending_user_text and self.project and self.pending_user_text[0]==self.project['id']:
                             _,pending_text,pending_origin=self.pending_user_text
                             saved=self.store.load(self.project['id'])

@@ -66,6 +66,27 @@ Para continuar SIN reiniciar el conjunto:
    Indica exactamente que parte de la respuesta no se pudo usar, sin mostrar
    el contenido del modelo.
 
+CORRECCION DEL ERROR "CANNOT USE 'DICT' AS A DICT KEY"
+-----------------------------------------------------
+Ese mensaje es el formato NUEVO de Python 3.14 para "unhashable type: dict".
+Ya NO debe aparecer: todas las claves de configuracion se normalizan y, si
+algo falla, Nexo guarda un diagnostico REDACTADO en
+%USERPROFILE%\.nexo-tesis\logs . En la pestana Documento pulsa
+"Copiar diagnostico" para compartirlo SIN incluir tu tesis ni tus claves.
+La "ventana blanca" de Copilot/Edge tambien se corrigio: Nexo cierra los
+procesos que el inicio cuando la conexion falla.
+
+AGENTE CONTINUO: SIN CUOTA DE PASOS
+-----------------------------------
+Pestana Documento > "Agente continuo . hasta terminar". El agente repite
+inspeccionar -> investigar en sitio -> escribir/editar -> verificar HASTA que
+la verificacion determina que el trabajo esta terminado. El modelo NO puede
+decir "listo" para detenerlo. No hay limite de pasos; hay topes de SEGURIDAD
+(60 minutos por defecto, cambio de estrategia ante estancamiento, fusible de
+llamadas, pregunta al usuario y el boton Detener). Veras y aprobaras cada
+consulta antes de que salga a Internet. El recibo queda en
+"Ver recibo del agente".
+
 NUEVO: AGENTE CON HERRAMIENTAS Y DOCUMENTO COMPLETO
 -----------------------------------------------------
 * Pestana "Documento" > "Generar documento completo": crea tres archivos
@@ -92,15 +113,16 @@ COMO SABER SI TIENES LA VERSION CORREGIDA
 -----------------------------------------
 Haz doble clic en VERIFICAR.cmd . En la pantalla debe aparecer:
 
-    Nexo Tesis 0.4.1-dev (agentloop-1) - comprobacion local (sin red)
+    Nexo Tesis 0.4.1-dev (fase6-1) - comprobacion local (sin red)
     ...
     Borradores largos: OK (hasta 20000 caracteres).
     Busqueda y plan: OK (consultas largas + apartados pendientes).
     Agente con herramientas: OK (inspeccionar, escribir, exportar, recibo).
+    Fases 1-6: OK (estado, puertas, investigacion, bucle continuo sin cuota).
     Todo correcto.
 
-Si NO aparecen las tres lineas "OK" o no dice
-"(agentloop-1)", estas abriendo una copia VIEJA de Nexo. Cierra la
+Si NO aparecen las CUATRO lineas "OK" o no dice
+"(fase6-1)", estas abriendo una copia VIEJA de Nexo. Cierra la
 aplicacion, descarga el ZIP nuevo y descomprimelo en una carpeta VACIA.
 Tus proyectos NO estan dentro de esa carpeta: estan en
 %USERPROFILE%\.nexo-tesis y se conservan.

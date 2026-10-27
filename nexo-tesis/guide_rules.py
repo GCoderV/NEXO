@@ -1,4 +1,5 @@
 """Conservative, evidenced rule proposals; user selects before any Word application."""
+from diagnostics import as_key, as_text
 import copy,hashlib,re,unicodedata
 DEFAULT={'page_size':'Carta','font':'Times New Roman','body_size':12,'heading_size':12,'subheading_size':12,'spacing':2.0,'margin_cm':2.54,'alignment':'izquierda'}
 LABELS={'include_section':'Apartado requerido (confirmar contexto)','page_size':'Papel','font':'Fuente','body_size':'Tamaño cuerpo','heading_size':'Tamaño títulos','subheading_size':'Tamaño subtítulos','spacing':'Interlineado','margin_cm':'Márgenes (cm)','alignment':'Alineación cuerpo','heading_case':'Mayúsculas/minúsculas (revisión manual)'}
@@ -34,14 +35,18 @@ def approve(p,record,candidates,indices):
     if not chosen:raise ValueError('Selecciona las reglas que revisaste; no se aplica una guía automáticamente.')
     values={}
     for r in chosen:
+        if not isinstance(r,dict):continue
+        key=as_key(r.get('key'),'rule.key')
+        if not key:continue
         if r.get('strength')=='ejemplo':raise ValueError('Una muestra o ejemplo no se aplica como requisito. Deja esa regla sin seleccionar o registra la decisión explícita en Memoria → guia.')
-        if r['key'] in ('font','body_size','spacing','margin_cm','alignment','page_size') and r.get('scope','general / por confirmar')!='general / por confirmar':raise ValueError('Regla de ámbito específico ('+r['scope']+'). No se convertirá en formato global; revísala manualmente.')
-        if r['key'] in ('include_section','heading_case'):continue
-        if r['key'] in values and values[r['key']]!=r['value']:raise ValueError('Hay valores contradictorios para '+LABELS[r['key']]+'. Elige cuál corresponde.')
-        values[r['key']]=r['value']
+        scope=as_text(r.get('scope','general / por confirmar'),'rule.scope',200)
+        if key in ('font','body_size','spacing','margin_cm','alignment','page_size') and scope!='general / por confirmar':raise ValueError('Regla de ámbito específico ('+scope+'). No se convertirá en formato global; revísala manualmente.')
+        if key in ('include_section','heading_case'):continue
+        if key in values and values[key]!=r.get('value'):raise ValueError('Hay valores contradictorios para '+LABELS.get(key,key)+'. Elige cuál corresponde.')
+        values[key]=r.get('value')
     effective={**DEFAULT,**{k:v for k,v in values.items() if k in DEFAULT}}
     validate(effective)
-    p['format_profile']={'name':'Guía revisada: '+record['name'],'source_id':record['id'],'sha256':record['sha256'],'rules':chosen,'effective':effective,'manual_checks':[r['value'] for r in chosen if r['key']=='heading_case']}
+    p['format_profile']={'name':'Guía revisada: '+record['name'],'source_id':record['id'],'sha256':record['sha256'],'rules':chosen,'effective':effective,'manual_checks':[r.get('value') for r in chosen if isinstance(r,dict) and as_key(r.get('key'),'rule.key')=='heading_case']}
     return p['format_profile']
 def validate(v):
     if v.get('page_size','Carta') not in ('Carta','A4'):raise ValueError('Tamaño de papel no admitido.')

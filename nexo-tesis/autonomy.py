@@ -1,4 +1,5 @@
 """Local bounded scheduler: academic drafts only, never Word or implicit recipients."""
+from diagnostics import as_key, as_text
 import hashlib,json,re,time,uuid,unicodedata
 from project_store import SECTIONS,LABELS,message,now
 
@@ -83,8 +84,16 @@ def order(p,task):
 
 def route_scope(api):
     if not hasattr(api,'routes'):return {(api.provider,api.model,getattr(api,'endpoint',''))}
-    accounts=api.config.data['accounts']
-    return {(r['provider'],r['model'],r['endpoint'],r['account_id'],accounts.get(r['account_id'],{}).get('generation','')) for r in api.routes}
+    accounts=api.config.data.get('accounts',{}) if isinstance(api.config.data,dict) else {}
+    if not isinstance(accounts,dict):accounts={}
+    out=set()
+    for r in api.routes:
+        if not isinstance(r,dict):continue
+        aid=as_key(r.get('account_id'),'route.account_id')
+        record=accounts.get(aid,{})
+        generation=as_text(record.get('generation',''),'generation') if isinstance(record,dict) else ''
+        out.add(tuple(as_text(r.get(k,''),'route.'+k) for k in ('provider','model','endpoint'))+(aid,generation))
+    return out
 
 def save_session(store,p,status,reason):
     p['autonomy'].update(status=status,reason=reason,updated=now())

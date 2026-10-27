@@ -1,3 +1,4 @@
+from diagnostics import as_key
 """Experimental M365 desktop-session transport. Independent implementation.
 Only captures a user-authorized probe in a loopback diagnostic session.
 No cookie store, passwords, refresh-token cache, TLS interception or DOM chat automation.
@@ -116,6 +117,25 @@ def sanitize_frame(frame):
     if len(json.dumps(out))>60000:raise ValueError('Invocación demasiado grande.')
     return out
 
+_LAUNCHED=[]  # Fase 0: no orphan windows after a failed connection.
+
+def close_launched():
+    """Terminate browsers/consoles Nexo started. Called in a finally block."""
+    dead=[]
+    for proc in list(_LAUNCHED):
+        try:
+            if proc.poll() is None:
+                proc.terminate()
+                try:proc.wait(timeout=3)
+                except Exception:proc.kill()
+        except Exception:
+            pass
+        dead.append(proc)
+    for proc in dead:
+        try:_LAUNCHED.remove(proc)
+        except ValueError:pass
+    return len(dead)
+
 def launch_desktop():
     if os.name!='nt':raise ValueError('Conectar la aplicación de escritorio requiere Windows. No se ha iniciado ningún programa.')
     script="$p=Get-AppxPackage -Name Microsoft.MicrosoftOfficeHub | Select-Object -First 1; if($p){Join-Path $p.InstallLocation 'M365Copilot.exe'}"
@@ -192,7 +212,7 @@ def capture_connection(port,probe=None,previous=None,stop=None,timeout=180,on_re
                 url=params.get('url','')
                 try:parse_url(url)
                 except Exception:continue
-                seen[params['requestId']]=url
+                seen[as_key(params.get('requestId'),'cdp.requestId')]=url
                 if previous is not None:
                     old_claim=capture_info(json.dumps(previous))[1];new_claim=claims(parse_url(url)[2])
                     if not old_claim.get('oid') or any(new_claim.get(k)!=old_claim.get(k) for k in ('oid','tid')):

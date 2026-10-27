@@ -152,12 +152,31 @@ def section_blocks(p):
     return blocks
 
 
+def _quality(p):
+    try:
+        from gates import evaluate
+        return evaluate(p)
+    except Exception as exc:
+        return {'hard': [], 'soft': ['No se pudieron evaluar las puertas: ' + type(exc).__name__],
+                'score': 0, 'passes': True}
+
+
 def compile_markdown(p):
+    quality = _quality(p)
     lines = ['# ' + (p.get('topic') or 'Tesis sin título'), '',
              '> Documento de trabajo generado por Nexo Tesis. No es una tesis validada: '
              'revisa cada afirmación, cita y dato antes de entregarlo.', '',
              'Generado: ' + now(), '', '## Estado del documento', '']
     lines += ['- ' + g for g in gaps(p)]
+    lines += ['', '### Puertas de calidad (deterministas, sin modelo)', '',
+              '- Puntuación: ' + str(quality['score']) + '/100 · ' +
+              str(len(quality['hard'])) + ' bloqueos · ' + str(len(quality['soft'])) + ' avisos.']
+    if quality['hard']:
+        lines += ['', '#### BLOQUEOS detectados por Nexo (revisar antes de entregar)', '']
+        lines += ['- ' + x for x in quality['hard']]
+    if quality['soft']:
+        lines += ['', '#### Avisos de calidad', '']
+        lines += ['- ' + x for x in quality['soft']]
     lines += ['', '## Apartados incluidos', '']
     for label, _body, state in section_blocks(p):
         lines.append('- {} — {}'.format(label, state))
@@ -168,6 +187,7 @@ def compile_markdown(p):
 
 
 def compile_html(p):
+    quality=_quality(p)
     def para(text):
         chunks = str(text).split('\n')
         return ''.join('<p>' + html.escape(c) + '</p>' if c.strip() else '<p>&nbsp;</p>' for c in chunks)
@@ -182,6 +202,14 @@ def compile_html(p):
              'revisa cada afirmación, cita y dato antes de entregarlo.</blockquote>',
              '<h2>Estado del documento</h2><ul>']
     parts += ['<li>' + html.escape(g) + '</li>' for g in gaps(p)]
+    parts += ['<li><strong>Puertas de calidad:</strong> ' + str(quality['score']) +
+              '/100 · ' + str(len(quality['hard'])) + ' bloqueos · ' +
+              str(len(quality['soft'])) + ' avisos</li>']
+    if quality['hard']:
+        parts += ['<li><strong>BLOQUEOS detectados por Nexo:</strong> revisar antes de entregar</li>']
+        parts += ['<li><strong>BLOQUEO:</strong> ' + html.escape(x) + '</li>' for x in quality['hard']]
+    if quality['soft']:
+        parts += ['<li><em>Aviso:</em> ' + html.escape(x) + '</li>' for x in quality['soft']]
     parts += ['</ul><hr>']
     for label, body, state in section_blocks(p):
         parts += ['<h2>' + html.escape(label) + '</h2>',
@@ -248,7 +276,12 @@ def compile_docx(p):
 
 
 def export(p, directory, basename=None):
-    """Write the three offline formats into `directory` (created if needed)."""
+    """Write the three offline formats into `directory` (created if needed).
+
+    Fase 4: attaches deterministic quality gates. A document with hard findings
+    is still written (the user owns the artifact) but says so on its first page.
+    """
+    quality = _quality(p)
     base = slug(basename or p.get('topic') or 'tesis')
     folder = Path(directory)
     folder.mkdir(parents=True, exist_ok=True)
@@ -262,7 +295,8 @@ def export(p, directory, basename=None):
     return {'directory': str(folder), 'files': sorted(files),
             'bytes': sum(len(v) for v in files.values()),
             'sections': len(section_blocks(p)), 'gaps': gaps(p),
-            'hidden': sorted(hidden(p)), 'extra': [e['label'] for e in extras(p)]}
+            'quality': quality, 'hidden': sorted(hidden(p)),
+            'extra': [e['label'] for e in extras(p)]}
 
 
 # --- The single validated write path -----------------------------------------
@@ -284,30 +318,31 @@ def _known_ids(p):
 
 
 def write_section(p, key, text, sources=(), producer='agente-loop'):
-    """Validate and store one section. This is the ONLY mutation entry point."""
+    """Delegates to `project_state.commit_slice`: the ONLY write path.
+
+    All guards (protected drafts, citations, empirical data, text bounds,
+    snapshots and downstream invalidation) live in project_state now.
+    """
+    import project_state
     if key not in order(p):
         raise ValueError('Apartado no existe en la estructura del documento.')
     if not isinstance(text, str) or not text.strip():
         raise ValueError('El texto del apartado está vacío.')
     old = p['drafts'].get(key)
-    if old and (old.get('edited_by_user') or old.get('status') in
-                ('aprobado_usuario', 'insertado_pendiente_revision_word')):
-        raise ValueError('El apartado está protegido: edítalo tú en Apartados antes de que el agente lo cambie.')
     if key in EMPIRICAL and not (p.get('data_ready') and p['facts'].get('datos')):
         raise ValueError('Faltan datos/corpus confirmados; no se redactarán resultados empíricos.')
     used = set(sources) | set(re.findall(r'\[([FD]\d+)\]', text))
     known = _known_ids(p)
     if not used <= known:
         raise ValueError('El texto cita fuentes inexistentes: ' + ', '.join(sorted(used - known)))
-    body = references(p) if key == 'referencias' else fit(text)
-    versions = (old.get('versions', []) + [{'text': old['text'], 'status': old['status'], 'time': now()}])[-5:] if old else []
-    p['drafts'][key] = {'text': body, 'sources': sorted(used), 'status': 'borrador',
-                        'warning': 'Propuesta del agente: revisar evidencia, coherencia y citas antes de aprobar.',
-                        'time': now(), 'versions': versions, 'material_ids': (old or {}).get('material_ids', []),
-                        'producer': {'provider': producer}}
-    from autonomy import fingerprint
-    p['drafts'][key]['auto_reviewed_for'] = fingerprint(p, body)
-    return {'section': key, 'label': label(p, key), 'chars': len(body), 'sources': sorted(used)}
+    receipts = project_state.write_sections(p, {key: text},
+                                            'Escritura de ' + label(p, key), producer)
+    draft = p['drafts'].get(key)
+    if not draft or draft is old:
+        raise ValueError('No se guardó el apartado (posible borrador protegido).')
+    draft['sources'] = sorted(used)
+    return {'section': key, 'label': label(p, key), 'chars': len(draft['text']),
+            'sources': sorted(used), 'commits': [r['module'] for r in receipts]}
 
 
 def patch_section(p, key, anchor, new_text, mode='insert_after'):

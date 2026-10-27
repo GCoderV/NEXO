@@ -13,9 +13,17 @@ INCREMENTAL_TASK=' Entrega el apartado de work_order completo en el MISMO format
 
 LOOP="""Ahora trabajas en BUCLE: resuelve el OBJETIVO con acciones reales, no promesas. Salida: UN SOLO objeto JSON, sin texto alrededor: {"reply":"avance breve","tool_calls":[{"name":"...","arguments":{...}}],"done":false}. Como maximo 4 herramientas por paso. Empieza inspeccionando (ver_documento, ver_pendientes, ver_estado, leer_apartado); elige UNA accion de escritura por paso y comprueba su resultado en el paso siguiente. Si un apartado ya existe, usa editar_texto para completar solo lo que falta en vez de reescribirlo entero. Si necesitas informacion del usuario, llama preguntar_usuario. Al terminar llama finalizar y pon done:true. No inventes fuentes, autores, anos, DOI ni resultados: cita solo [F#] presentes en FUENTES. No repitas una herramienta que acaba de fallar sin cambiar sus argumentos. Nunca afirmes haber buscado o exportado si la herramienta no devolvio OK."""
 
-def loop_instructions(guide,pass_number,max_passes,state,receipt,goal=''):
+def loop_instructions(guide,pass_number,max_passes,state,receipt,goal='',continuous=False):
     """Full contract on every pass: a delta context must not hide the tool API."""
-    tail=('\nPaso '+str(pass_number)+'/'+str(max_passes)+'. Estado del documento: '
+    if continuous:
+        mode=('\nMODO CONTINUO: NO hay cuota de pasos. Repite el ciclo '
+              'inspeccionar → investigar → escribir/editar → verificar HASTA que '
+              'verificar() devuelva done=true. No pongas done:true ni llames finalizar '
+              'antes de esa comprobación. Si una herramienta falla, cambia de estrategia. '
+              'El anfitrión investiga automáticamente cuando faltan fuentes; cita solo [F#] reales.')
+    else:
+        mode=''
+    tail=(mode+'\nPaso '+str(pass_number)+'/'+(str(max_passes) if max_passes else 'continuo')+'. Estado del documento: '
           +json.dumps(state,ensure_ascii=False)[:900]
           +'\nObjetivo: '+str(goal)[:600]
           +'\nResultados del paso anterior:\n'+(str(receipt)[:2000] or '(ninguno; es el primer paso)'))

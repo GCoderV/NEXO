@@ -154,7 +154,20 @@ class ThreadAndReferencesTests(unittest.TestCase):
         with zipfile.ZipFile('/home/user/nexo-tesis-v0.3.1-windows.zip') as z:old=z.read('Nexo-Tesis-0.3.1/copilot_socket.py').decode()
         new=Path('copilot_socket.py').read_text()
         def funcs(s):return {n.name:ast.get_source_segment(s,n) for n in ast.parse(s).body if isinstance(n,ast.FunctionDef)}
-        for name in ('launch_desktop','launch_auth_window','capture_connection','sanitize_frame'):self.assertEqual(funcs(old)[name],funcs(new)[name])
+        of,nf=funcs(old),funcs(new)
+        # sanitize_frame is a credential boundary; it must stay byte-identical.
+        self.assertEqual(of['sanitize_frame'],nf['sanitize_frame'])
+        # Fase 0 deliberately changed capture_connection (CDP requestId type
+        # validation) and the launchers gained tracked-process cleanup. The old
+        # byte-equality assertion is replaced by the invariants that matter,
+        # because Windows launch/capture behaviour was NEVER verified here.
+        for name in ('launch_desktop','launch_auth_window','capture_connection'):
+            for token in ('127.0.0.1','m365.cloud.microsoft','localhost'):
+                if token in of[name]:self.assertIn(token,nf[name],name+' perdió '+token)
+        self.assertIn("os.name!='nt'",nf['launch_desktop'])
+        self.assertIn('No se encontró',nf['launch_auth_window'])
+        self.assertIn('as_key(params.get',nf['capture_connection'])
+        self.assertIn('CREATE_NO_WINDOW',Path('process_guard.py').read_text())
 
 class ProvenanceTests(unittest.TestCase):
     setUp=MaterialTests.setUp

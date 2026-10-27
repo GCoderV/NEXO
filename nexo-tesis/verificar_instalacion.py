@@ -13,7 +13,8 @@ ROOT = Path(__file__).resolve().parent
 CORE = ('agent', 'autonomy', 'bibliography', 'config', 'context_policy',
         'conversation_state', 'copilot_metadata', 'copilot_socket', 'guide_rules',
         'materials', 'native_material', 'project_store', 'prompt_policy', 'providers',
-        'document', 'agent_tools',
+        'document', 'agent_tools', 'diagnostics', 'process_guard',
+        'project_state', 'gates', 'research', 'run_loop',
         'routing', 'secrets_store', 'word_bridge', 'word_layout', 'pypdf', 'websocket')
 UI = ('app', 'material_dialog', 'settings_dialog', 'word_layout_dialog')
 
@@ -161,6 +162,81 @@ def check_loop():
     return []
 
 
+def check_fase6():
+    """Offline proof of the Fase 1–6 core: state, gates, research, continuous loop."""
+    import json
+    import tempfile
+    from agent import Agent
+    from project_store import ProjectStore
+    import project_state as ps
+    import gates
+    import research
+    import run_loop
+
+    with tempfile.TemporaryDirectory() as data:
+        store = ProjectStore(data)
+        p = store.create('Tema de comprobacion local')
+        from project_store import set_fact
+        # set_fact invalidates drafts; do it BEFORE seeding them so the
+        # derived status map reflects content, not a stale review flag.
+        set_fact(p, 'datos', 'Corpus de prueba: 68%')
+        p['data_ready'] = True
+        p['sources'] = [{'id': 'F1', 'title': 'Obra', 'doi': '10.1/x',
+                         'url': 'https://doi.org/10.1/x', 'status': 'metadatos'}]
+        for key in ('delimitacion', 'problematica', 'pregunta', 'objetivos',
+                    'justificacion', 'marco_teorico', 'metodologia', 'instrumentos',
+                    'plan_accion', 'analisis_previsto', 'cronograma', 'presupuesto',
+                    'anexos', 'referencias'):
+            p['drafts'][key] = {'text': 'Contenido de comprobacion [F1]. ' * 6,
+                                'status': 'borrador', 'sources': ['F1']}
+        verification = ps.verify(p)
+        if not verification['done']:
+            return ['La verificacion determinista no reconocio un proyecto completo: ' +
+                    str(verification['missing'][:3]) + str(verification['blocked'][:3])]
+        hard = gates.evaluate(p)['hard']
+        if hard:
+            return ['Las puertas duras bloquearon un proyecto limpio: ' + str(hard[:2])]
+        merged = research.dedupe([
+            {'title': 'Paper', 'doi': '10.1/a', 'origin': 'Crossref'},
+            {'title': 'Paper', 'doi': '10.1/A', 'origin': 'OpenAlex'}])
+        if len(merged) != 1 or len(merged[0]['verified_by']) != 2:
+            return ['La deduplicacion con proveniencia no funciona.']
+        offline = research.discover(p, queries=['role play'], allow_network=False,
+                                    providers=[('Crossref', research._crossref)])
+        if offline['items'] or not offline['errors']:
+            return ['La investigacion sin red no se contuvo correctamente.']
+        profile = run_loop.RunProfile(max_passes=None, allow_research=False,
+                                      auto_research=False, allow_export=False)
+        if profile.max_passes is not None or 'Sin cuota' not in profile.describe():
+            return ['El modo continuo tiene una cuota de pasos.']
+
+        def response(text, calls):
+            return json.dumps({'reply': text, 'tool_calls': [
+                {'name': n, 'arguments': a} for n, a in calls], 'done': False})
+
+        class StubAPI:
+            provider = 'verificacion-local'
+            model = 'sin-red'
+            key = ''
+            endpoint = ''
+            last_usage = {}
+            def __init__(self):
+                self.requests = []
+                self.instructions = ''
+            def request(self, conversation, declarations):
+                self.requests.append(conversation)
+                return {}, response('Verifico', [('verificar', {})]), []
+
+        store.save(p)
+        api = StubAPI()
+        result = Agent(store, api).turn(p['id'], 'Termina', origin='usuario',
+                                        loop=profile.loop_config())
+        if result.get('last_loop', {}).get('stopped') != 'trabajo_completado':
+            return ['El bucle continuo no se detuvo por verificacion: ' +
+                    str(result.get('last_loop', {}).get('stopped'))]
+    return []
+
+
 def main():
     problems = []
     print(f'Nexo Tesis {VERSION} ({BUILD}) - comprobacion local (sin red)')
@@ -239,6 +315,15 @@ def main():
             problems += loop_issues
         else:
             print('Agente con herramientas: OK (inspeccionar, escribir, exportar, recibo).')
+    try:
+        fase6_issues = check_fase6()
+    except Exception as e:
+        problems.append('No se pudo comprobar el nucleo de las fases 1-6: ' + type(e).__name__ + ' ' + str(e)[:100])
+    else:
+        if fase6_issues:
+            problems += fase6_issues
+        else:
+            print('Fases 1-6: OK (estado, puertas, investigacion, bucle continuo sin cuota).')
     if problems:
         print('')
         print('PROBLEMAS ENCONTRADOS:')

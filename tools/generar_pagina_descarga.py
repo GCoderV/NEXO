@@ -40,7 +40,7 @@ BODY = """<body><main>
 <p class="meta">{size} bytes · {files} archivos · <span id="hash">verificando integridad…</span></p>
 <p class="meta">SHA-256 esperado: <code>{sha}</code></p>
 
-<div class="news"><strong>Novedades de esta copia:</strong> el punto muerto de la investigación está corregido (las consultas booleanas largas ya no se rechazan y se ejecutan realmente en Crossref); hay un botón <em>Buscar fuentes</em>; el planificador ya no dice «no hay tareas» mientras falten Instrumentos, Cronograma, Presupuesto, Anexos, Referencias o Antecedentes. Se añadió un <strong>agente con herramientas</strong> en bucle acotado (inspeccionar, escribir, editar solo lo que falta, añadir/quitar apartados, generar el documento completo) y la pestaña <strong>Documento</strong> exporta Markdown, HTML y DOCX sin Word ni internet. <strong>Para confirmar que abres esta copia:</strong> ejecuta <code>VERIFICAR.cmd</code> y comprueba que dice <code>({build})</code> y las tres líneas <code>OK</code>. Si no aparecen, estás usando una carpeta antigua.</div>
+<div class="news"><strong>Novedades de esta copia:</strong> el punto muerto de la investigación está corregido (las consultas booleanas largas ya no se rechazan y se ejecutan realmente en Crossref); hay un botón <em>Buscar fuentes</em>; el planificador ya no dice «no hay tareas» mientras falten Instrumentos, Cronograma, Presupuesto, Anexos, Referencias o Antecedentes. Se añadió un <strong>agente continuo sin cuota de pasos</strong> que investiga en sitio y repite hasta verificar el trabajo terminado (inspeccionar, escribir, editar solo lo que falta, añadir/quitar apartados, generar el documento completo) y la pestaña <strong>Documento</strong> exporta Markdown, HTML y DOCX sin Word ni internet. <strong>Para confirmar que abres esta copia:</strong> ejecuta <code>VERIFICAR.cmd</code> y comprueba que dice <code>({build})</code> y las cuatro líneas <code>OK</code>. Si no aparecen, estás usando una carpeta antigua.</div>
 
 <div class="box">
 <strong>Si el botón no descarga</strong> (algunos visores bloquean descargas):
@@ -109,7 +109,7 @@ def build():
             '<meta name="viewport" content="width=device-width,initial-scale=1">\n'
             '<title>Descarga directa · Nexo Tesis 0.4.1-dev</title>\n'
             '<style>' + CSS + '</style>\n</head>\n' +
-            BODY.format(build='agentloop-1', b64=base64.b64encode(data).decode('ascii'),
+            BODY.format(build='fase6-1', b64=base64.b64encode(data).decode('ascii'),
                         size='{:,}'.format(len(data)).replace(',', '.'), files=files, sha=sha))
     OUT.parent.mkdir(parents=True, exist_ok=True)
     OUT.write_text(page, 'utf-8')

@@ -72,10 +72,34 @@ Las librerías `websocket` y `pypdf` ya vienen incluidas: no hay que instalar na
 - Idea de diseño tomada de proyectos abiertos (DoThesis, Loopy,
   agentic-thesis-writing, Academic Writing Toolkit): una sola vía de escritura,
   pasos acotados con comprobación y recibo, y aprobación humana antes de actuar.
-- El verificador de arranque muestra `(agentloop-1)` y comprueba de forma
-  funcional: borradores >10 000 caracteres, consultas largas + planificador y
-  un bucle completo de agente con exportación, TODO sin red.
-- Pruebas locales: 416 superadas / 2 omitidas con fixtures sintéticas.
+- FASE 0: se corrige el error real `cannot use 'dict' as a dict key`
+  (Python 3.14 cambió el mensaje). `diagnostics.py` guarda un traceback
+  REDACTADO en ~/.nexo-tesis/logs y la UI muestra un mensaje útil con botón
+  «Copiar diagnóstico». Todas las fronteras de claves de diccionario usan
+  `as_key()`. `process_guard.py` cierra las ventanas de Copilot/Edge huérfanas
+  cuando falla la conexión; ahí estaba la «ventana blanca».
+- FASE 1: `project_state.commit_slice` es la UNICA vía de escritura. Cinco
+  módulos M1–M5 con DAG de invalidación, snapshots antes de aplicar, deshacer
+  y verificación determinista de finalización.
+- FASE 2: **modo agente continuo SIN CUOTA DE PASOS** (`run_loop.RunProfile`).
+  Repite inspeccionar → investigar → escribir/editar → verificar hasta que
+  `project_state.verify()` dice `done=true`. El modelo NO puede declarar
+  "listo". Topes que NO son cuota: reloj, estancamiento tras cambiar de
+  estrategia, fusible de llamadas, pregunta al usuario y botón Detener.
+- FASE 3: `research.py` investiga EN SITIO con Crossref, OpenAlex, Semantic
+  Scholar y arXiv; deduplica con proveniencia, marca verificación en 2+ bases
+  y nunca afirma que un paper respalda una afirmación. `gates.py` bloquea
+  citas/DOI inventados, cifras sin datos y porcentajes imposibles.
+- FASE 4: `document.py` adjunta las puertas de calidad a Markdown/HTML/DOCX;
+  el documento completo sigue siendo offline y sin dependencias.
+- FASE 5: pestaña Documento con estado M1–M5, confirmación y deshacer,
+  recibo auditable, diálogos con dueño y una sola ventana.
+- FASE 6: `VERIFICAR.cmd` muestra `(fase6-1)` y ejecuta CINCO comprobaciones
+  funcionales sin red, incluido un bucle continuo que termina por verificación.
+- Pruebas locales: 467 superadas / 2 omitidas con fixtures sintéticas.
+- Ideas funcionales de DoThesis, Loopy, agentic-thesis-writing y Academic
+  Writing Toolkit, analizadas con metodología REA (ver
+  RECONSTRUCCION-FASES-0-6.md, incluido en este paquete).
 - **NO verificado**: sesión real de Copilot, recuerdo del servidor, Word COM,
   DPAPI, PowerShell de Windows ni la interfaz Tk en este entorno.
 - La cabecera `X-RoutingParameter-SessionKey` es evidencia de terceros sin
@@ -98,7 +122,9 @@ FORBIDDEN_NAMES = ('.gitignore', '.env', 'config.json', 'preferences.json',
                    'projects.sqlite3', 'SHA256SUMS.txt')
 # Conveniencias de "listo para usar" añadidas en 0.4.1-dev.
 READY_EXTRAS = ('LEER-PRIMERO.txt', 'VERIFICAR.cmd', 'verificar_instalacion.py',
-                'version.py', 'limits.py', 'document.py', 'agent_tools.py')
+                'version.py', 'limits.py', 'document.py', 'agent_tools.py',
+                'diagnostics.py', 'process_guard.py', 'project_state.py',
+                'gates.py', 'research.py', 'run_loop.py')
 
 
 def runtime_paths():
@@ -129,6 +155,8 @@ def build():
         ROOT / 'contexto' / 'INCIDENCIA-FORMATO-BORRADOR.md').read_bytes()
     entries['AGENTE-LOOP-Y-DOCUMENTO.md'] = (
         ROOT / 'contexto' / 'AGENTE-LOOP-Y-DOCUMENTO.md').read_bytes()
+    entries['RECONSTRUCCION-FASES-0-6.md'] = (
+        ROOT / 'contexto' / 'RECONSTRUCCION-FASES-0-6.md').read_bytes()
     manifest = ''.join(
         hashlib.sha256(entries[rel]).hexdigest() + '  ' + rel + '\n'
         for rel in sorted(entries))

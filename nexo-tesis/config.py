@@ -37,6 +37,8 @@ def atomic(path,data):
         os.replace(name,path)
     finally:
         if os.path.exists(name):os.unlink(name)
+from diagnostics import as_key, as_text, MAX_LOG_CHARS
+
 class Config:
     def __init__(self,root,protector=None):
         self.path=Path(root)/'config.json';self.protector=protector or WindowsProtector();self.memory={};self.warning='';self.needs_backup=False
@@ -125,6 +127,8 @@ class Config:
         self.warning=(self.warning+' Configuración migrada: revisa las cuentas y marca las rutas que desees incluir en rotación.').strip()
     @locked
     def secret(self,aid):
+        aid=as_key(aid,'secret.aid')
+        if not aid:return ''
         if aid in self.memory:return self.memory[aid]
         a=self.data['accounts'].get(aid,{})
         return self.protector.open(a['secret']) if a.get('secret') else ''
@@ -236,7 +240,7 @@ class Config:
         # Same account/model/endpoint is a single route, even if configured twice.
         seen=set();out=[]
         for r in result:
-            ident=(r['provider'],r['model'],r['account_id'],r['endpoint'])
+            ident=tuple(as_text(r.get(k,''),'candidate.'+k) for k in ('provider','model','account_id','endpoint'))
             if ident not in seen:seen.add(ident);out.append(r)
         if not out:raise ValueError('No hay rutas habilitadas con una credencial utilizable. Configura o selecciona otra.')
         return out
@@ -245,7 +249,7 @@ class Config:
         return RoutedAPI(self,self.candidates())
     @locked
     def redact(self,text):
-        text=str(text)
+        text=as_text(text,'redact.text',MAX_LOG_CHARS)
         for aid in self.data['accounts']:
             try:k=self.secret(aid)
             except Exception:continue

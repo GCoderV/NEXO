@@ -36,6 +36,12 @@ TOOLS = {
                         'evidencia': 'cita literal del mensaje del usuario'}, True, 'user_fact'),
     'preguntar_usuario': ({'texto': 'pregunta concreta'}, True, 'boundary'),
     'finalizar': ({'motivo': 'por qué se detiene'}, False, 'boundary'),
+    'investigar': ({'terminos': 'términos opcionales separados por ;'}, True, 'research'),
+    'verificar': ({}, False, ''),
+    'estado_modulos': ({}, False, ''),
+    'siguiente_paso': ({}, False, ''),
+    'confirmar_modulo': ({'modulo': 'M1..M5'}, True, ''),
+    'deshacer': ({}, True, ''),
 }
 
 TOOL_GUIDE = (
@@ -45,6 +51,10 @@ TOOL_GUIDE = (
     'editar_texto(section,fragmento,nuevo,modo) · anadir_apartado(titulo,despues_de) · '
     'quitar_apartado(section) · restaurar_apartado(section) · generar_documento() · '
     'registrar_dato(clave,valor,evidencia) · preguntar_usuario(texto) · finalizar(motivo).\n'
+    'investigar(terminos) · verificar() · estado_modulos() · siguiente_paso() · '
+    'confirmar_modulo(modulo) · deshacer().\n'
+    'En modo continuo NO hay cuota de pasos: repite hasta que verificar() diga done=true. '
+    'No declares "listo" sin haber llamado verificar().\n'
     'Usa las claves que devuelve ver_documento. Nunca escribas Word ni archivos fuera del proyecto.'
 )
 
@@ -108,7 +118,68 @@ def execute(p, call, services):
               'changed': False, 'stop': None}
     needs = TOOLS[name][2]
     try:
-        if needs == 'research':
+        if name == 'investigar':
+            if not services.get('allow_research') or services.get('approve_search') is None:
+                raise ValueError('La investigación externa no está autorizada en esta sesión.')
+            import research
+            raw = args.get('terminos')
+            queries = None
+            if isinstance(raw, str) and raw.strip():
+                queries = [q.strip()[:180] for q in raw.split(';') if len(q.strip()) >= 4][:4]
+            outcome = research.research_for(
+                p, approve=lambda qs: services['approve_search'](
+                    '; '.join(qs), 'Investigación automática en sitio'),
+                on_event=services.get('emit'),
+                allow_network=services.get('allow_network', True),
+                max_queries=4, deadline_s=40, queries=queries)
+            result['data'] = {k: outcome.get(k) for k in
+                              ('added', 'attempted', 'verified', 'errors', 'queries', 'providers', 'note')}
+            result['summary'] = ('Investigación: ' + str(outcome.get('added', 0)) + ' fuentes nuevas, ' +
+                                 str(outcome.get('verified', 0)) + ' verificadas en 2+ bases, ' +
+                                 str(outcome.get('attempted', 0)) + ' consultas. ' +
+                                 (outcome.get('reason', '') if not outcome.get('ok') else ''))
+            if outcome.get('added'):
+                result['changed'] = True
+                result['data']['new_ids'] = [s['id'] for s in p.get('sources', [])[-outcome['added']:]]
+
+        elif name == 'verificar':
+            import project_state
+            check = project_state.verify(p, services.get('include_optional', True))
+            result['data'] = check
+            result['summary'] = ('VERIFICACIÓN: ' + ('TRABAJO TERMINADO' if check['done'] else 'AÚN NO') +
+                                 '. ' + check['summary'] + ' Puertas duras: ' +
+                                 str(len(check['blocked'])) + '. Puntuación: ' + str(check['score']) + '/100.')
+
+        elif name == 'estado_modulos':
+            import project_state
+            status = project_state.status_map(p)
+            slices = {m: project_state.read_slice(p, m) for m in project_state.MODULES}
+            result['data'] = {'status': status, 'slices': slices}
+            result['summary'] = ' · '.join(m + '=' + status[m] for m in status)
+
+        elif name == 'siguiente_paso':
+            import project_state
+            action = project_state.next_action(p, services.get('include_optional', True))
+            result['data'] = action
+            result['summary'] = (action['module'] or 'FIN') + ': ' + action['reason'] +                                 ' Herramienta sugerida: ' + action['suggested_tool']
+
+        elif name == 'confirmar_modulo':
+            import project_state
+            module = _text(args, 'modulo', limit=4).upper()
+            if module not in project_state.MODULES:
+                raise ValueError('Módulo inválido (M1..M5).')
+            status = project_state.confirm_module(p, module, services.get('producer', 'agente'))
+            result.update(data={'status': status}, changed=True,
+                          summary='Módulo ' + module + ' confirmado. Estado: ' + status[module])
+
+        elif name == 'deshacer':
+            import project_state
+            undone = project_state.undo_last(p)
+            result.update(data=undone, changed=bool(undone.get('ok')),
+                          summary=('Se deshizo el último commit: ' + ', '.join(undone.get('restored', []))
+                                   if undone.get('ok') else undone.get('reason', 'Nada que deshacer.')))
+
+        elif needs == 'research':
             if not services.get('allow_research') or services.get('approve_search') is None:
                 raise ValueError('La búsqueda externa no está autorizada en esta sesión.')
             query = _text(args, 'query', limit=2000)

@@ -21,28 +21,23 @@ Código y contexto para continuar el desarrollo en una sesión limpia.
 >
 > **Descarga (build de desarrollo, no release):**
 > [nexo-tesis-v0.4.1-dev-windows.zip](releases/nexo-tesis-v0.4.1-dev-windows.zip)
-> (629.073 bytes, 117 archivos, build `agentloop-1`). SHA-256:
-> `d4200de4a021b1e9d4fdb934324f8b4e398c801321ce026248588ae514f47094`.
-> Página autónoma con el ZIP embebido (sin GitHub ni servidor):
-> [descarga/descargar-nexo-tesis.html](descarga/descargar-nexo-tesis.html).
+> (124 archivos, build `fase6-1`). Página autónoma con el ZIP embebido (sin
+> GitHub ni servidor): [descarga/descargar-nexo-tesis.html](descarga/descargar-nexo-tesis.html).
+> SHA-256: `PENDIENTE`.
 >
-> **Correcciones de esta copia:** consultas booleanas largas que antes se
-> rechazaban y nunca llegaban a Crossref; botón «Buscar fuentes»; planificador
-> que ya no declara «no hay tareas» mientras falten apartados; borradores de
-> 20 000 caracteres con recorte visible; Copilot365 sin API key; JSON válido
-> envuelto aceptado; auditoría de robustez. Ver
-> [AGENTE-LOOP-Y-DOCUMENTO.md](contexto/AGENTE-LOOP-Y-DOCUMENTO.md) y
-> [INCIDENCIA-FORMATO-BORRADOR.md](contexto/INCIDENCIA-FORMATO-BORRADOR.md).
->
-> **Nuevo:** agente con herramientas en bucle acotado (15 herramientas, 2–12
-> pasos, recibo auditable) para inspeccionar el documento, buscar fuentes,
-> escribir o **editar solo la parte que falta**, añadir/quitar apartados y
-> **generar el documento completo** en Markdown, HTML y DOCX OOXML sin Word,
-> sin red y sin dependencias. Ideas funcionales de DoThesis, Loopy,
-> agentic-thesis-writing, Academic Writing Toolkit, OpenDraft,
-> open-paper-machine, paper-revision-skill y agentic-research (enlaces en el
-> informe). 416 pruebas superadas / 2 omitidas. `VERIFICAR.cmd` debe mostrar
-> `(agentloop-1)` y tres líneas «OK» para confirmar la copia correcta.
+> **Reconstrucción Fases 0–6.** Se corrigió el error real
+> `cannot use 'dict' as a dict key` (mensaje de Python 3.14) con un log de
+> diagnóstico redactado y normalización de tipos; se eliminó la ventana blanca
+> huérfana de Copilot/Edge; se implantó un estado único con `commit_slice` y
+> DAG M1–M5; investigación verificable en sitio (Crossref, OpenAlex, Semantic
+> Scholar, arXiv); puertas duras contra citas/DOI/cifras inventadas; y un
+> **agente continuo sin cuota de pasos** que repite hasta que la verificación
+> determinista declara el trabajo terminado (con reloj, cambio de estrategia,
+> fusible y botón Detener como topes de seguridad, no como cuota).
+> Informes: [RECONSTRUCCION-FASES-0-6.md](contexto/RECONSTRUCCION-FASES-0-6.md)
+> y [AGENTE-LOOP-Y-DOCUMENTO.md](contexto/AGENTE-LOOP-Y-DOCUMENTO.md).
+> 467 pruebas superadas / 2 omitidas. `VERIFICAR.cmd` debe mostrar `(fase6-1)`
+> y cuatro líneas `OK`.
 >
 > **Listo para usar:** descomprimir en una carpeta vacía y hacer doble clic en
 > `INICIAR-TESIS.cmd` (se autoverifica y abre la app). Requiere Python 3.11+ con

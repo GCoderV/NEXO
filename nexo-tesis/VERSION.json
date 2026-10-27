@@ -192,7 +192,7 @@
     "files": 111,
     "runtime_only": true,
     "internal_sha256sums": true,
-    "tests_run_against_extracted_package": "416 passed / 2 skipped",
+    "tests_run_against_extracted_package": "467 passed / 2 skipped",
     "tk_interface_executed": false,
     "ready_to_use": {
       "quickstart": "LEER-PRIMERO.txt",
@@ -203,7 +203,7 @@
       "bundled_dependencies": "websocket-client and pypdf vendored in the package"
     },
     "self_check_branches_tested": "failure (Tk missing on Linux) and success (Tk simulated)",
-    "self_check_marker": "agentloop-1 + \"Borradores largos: OK\" + \"Busqueda y plan: OK\" + \"Agente con herramientas: OK\""
+    "self_check_marker": "fase6-1 + 5 lineas OK (borradores, busqueda, herramientas, fases 1-6)"
   },
   "response_format": {
     "single_complete_json_object": true,
@@ -248,6 +248,18 @@
     "http_400_response_format_relaxed_once": true,
     "error_reason_redacted": true
   },
+  "continuous_agent": {
+    "no_step_quota": true,
+    "completion": "project_state.verify() + deterministic gates",
+    "safety": ["wall clock", "stall after strategy changes", "hard fuse", "Detener", "human question"],
+    "in_place_research": "research.research_for with per-query approval, 4 APIs, provenance"
+  },
+  "single_write_path": {
+    "module": "project_state.commit_slice",
+    "modules": ["M1", "M2", "M3", "M4", "M5"],
+    "invalidation_dag": "M1->M2..M5, M2->M3..M5, M3->M4,M5, M4->M5",
+    "snapshots": 8
+  },
   "agent_loop": {
     "modules": ["document.py", "agent_tools.py"],
     "max_passes": 12,
@@ -258,5 +270,5 @@
     "word_modified_by_agent": false,
     "research_report": "AGENTE-LOOP-Y-DOCUMENTO.md"
   },
-  "build": "agentloop-1"
+  "build": "fase6-1"
 }

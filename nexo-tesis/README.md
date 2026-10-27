@@ -241,12 +241,56 @@ nunca se modifica. Ideas funcionales de proyectos abiertos (DoThesis, Loopy,
 agentic-thesis-writing, Academic Writing Toolkit, OpenDraft) en
 `AGENTE-LOOP-Y-DOCUMENTO.md`, incluido en este paquete.
 
-`VERIFICAR.cmd` muestra `(agentloop-1)` y ejecuta tres comprobaciones
+`VERIFICAR.cmd` muestra `(fase6-1)` y ejecuta tres comprobaciones
 funcionales sin red: borradores largos, consultas largas + planificador y un
-bucle completo del agente con exportación válida. **416 pruebas** superadas /
+bucle completo del agente con exportación válida. **467 pruebas** superadas /
 2 omitidas con fixtures sintéticas. Sin verificación real de Tk, Word COM,
 DPAPI, Microsoft 365 Copilot ni de que Word abra el DOCX generado en este
 entorno.
+
+## Reconstrucción por fases (build `fase6-1`)
+
+Tras el error real `cannot use 'dict' as a dict key (unhashable type: 'dict')`
+(mensaje nuevo de Python 3.14) y una ventana blanca huérfana de Copilot/Edge, se
+reconstruyó el núcleo con ideas de DoThesis, Loopy, agentic-thesis-writing y
+Academic Writing Toolkit, analizadas con metodología REA. Detalle completo en
+`RECONSTRUCCION-FASES-0-6.md`, incluido en el ZIP.
+
+- **Fase 0 — Diagnóstico.** `diagnostics.py` guarda un traceback **redactado**
+  en `~/.nexo-tesis/logs/` y la UI muestra un mensaje útil con «Copiar
+  diagnóstico» en lugar del mensaje crudo del intérprete. `as_key()` normaliza
+  todas las fronteras de claves de diccionario. `process_guard.py` cierra los
+  procesos de Copilot/Edge que Nexo inició cuando la conexión falla.
+- **Fase 1 — Estado único.** `project_state.commit_slice()` es la única vía de
+  escritura: cinco módulos M1–M5, DAG de invalidación, snapshots, deshacer y
+  verificación determinista. Proyectos 0.4.x migran sin perder borradores.
+- **Fase 2 — Agente continuo SIN CUOTA DE PASOS.** `run_loop.RunProfile` con
+  `max_passes=None`: repite inspeccionar → investigar → escribir/editar →
+  verificar hasta que `project_state.verify()` dice `done=true`. El modelo no
+  puede declarar «listo». Topes que **no son cuota**: reloj (60 min por defecto),
+  estancamiento tras cambiar de estrategia, fusible de 300 llamadas, pregunta al
+  usuario y botón Detener. Cada parada deja un recibo auditable.
+- **Fase 3 — Investigación en sitio.** `research.py` consulta Crossref,
+  OpenAlex, Semantic Scholar y arXiv con presupuesto, deduplica con
+  proveniencia y marca verificación en 2+ bases. Sólo metadatos/resúmenes;
+  nunca afirma que un paper respalda una afirmación. `gates.py` bloquea citas y
+  DOI inventados, cifras sin corpus confirmado y porcentajes imposibles.
+- **Fase 4 — Documento.** Markdown/HTML/DOCX OOXML offline con las puertas de
+  calidad adjuntas. Ocultar un apartado conserva su borrador.
+- **Fase 5 — UI.** Pestaña Documento con estado M1–M5, «Agente continuo · hasta
+  terminar», confirmar módulo, deshacer, recibo y diagnóstico.
+- **Fase 6 — Validación.** 467 pruebas / 2 omitidas. `VERIFICAR.cmd` muestra
+  `(fase6-1)` y ejecuta cinco comprobaciones funcionales sin red, incluido un
+  bucle continuo que termina por verificación.
+
+**Uso del modo continuo:** Documento → «Agente continuo · hasta terminar» →
+aprobar el conjunto. Verás y autorizarás cada consulta antes de que salga a la
+red. El botón Detener funciona en cualquier momento.
+
+**No verificado aquí:** Windows real, Tk con display, Word COM, DPAPI, sesión
+real de M365 Copilot, respuesta real de las APIs académicas y apertura del DOCX
+en Word. Python 3.14 no está en el sandbox (hay 3.11.2); la corrección valida
+tipos, no mensajes de error.
 
 ## Datos, recuperación y comprobaciones de esta versión
 

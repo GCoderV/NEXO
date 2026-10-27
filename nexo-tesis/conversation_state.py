@@ -13,6 +13,7 @@ cookies, authenticated headers or message bodies: PERSISTED is the complete whit
 """
 from datetime import datetime, timezone
 import copy
+from diagnostics import as_key, as_text
 import hashlib
 import json
 import re
@@ -38,17 +39,30 @@ def _digest(parts):
 
 
 def _accounts(api):
-    return (getattr(getattr(api, 'config', None), 'data', {}) or {}).get('accounts', {}) or {}
+    value = (getattr(getattr(api, 'config', None), 'data', {}) or {}).get('accounts', {}) or {}
+    return value if isinstance(value, dict) else {}
+
+
+def _routes(api):
+    value = getattr(api, 'routes', None) or []
+    return [r for r in value if isinstance(r, dict)] if isinstance(value, (list, tuple)) else []
+
+
+def _account_id(route):
+    return as_key(route.get('account_id'), 'route.account_id')
 
 
 def routes(api):
-    return [r for r in (getattr(api, 'routes', None) or [])
-            if isinstance(r, dict) and r.get('provider') == 'Copilot365' and r.get('account_id')]
+    return [r for r in _routes(api)
+            if as_text(r.get('provider'), 'route.provider') == 'Copilot365' and _account_id(r)]
 
 
 def account_identity(api, aid):
     """Stable account scope. Never returns a token; falls back to the account id."""
+    aid = as_key(aid, 'account_identity.aid')
+    if not aid:return ''
     record = _accounts(api).get(aid, {}) or {}
+    if not isinstance(record, dict):record = {}
     stored = record.get('identity')
     if isinstance(stored, str) and re.fullmatch(r'[a-f0-9]{64}', stored):
         return stored
@@ -56,7 +70,7 @@ def account_identity(api, aid):
     if callable(getter):
         try:
             from copilot_socket import identity_fingerprint
-            found = identity_fingerprint(getter(aid))
+            found = identity_fingerprint(as_text(getter(aid), 'secret'))
             if found:
                 return found
         except Exception:
@@ -66,15 +80,22 @@ def account_identity(api, aid):
 
 def keys(api):
     """Current keys: identity of the account + endpoint, never the credential generation."""
-    return {r['account_id']: _digest(['m365-thread-v2', account_identity(api, r['account_id']), r.get('endpoint', '')])
-            for r in routes(api)}
+    return {aid: _digest(['m365-thread-v2', account_identity(api, aid),
+                          as_text(r.get('endpoint', ''), 'route.endpoint')])
+            for r in routes(api) for aid in [_account_id(r)] if aid}
 
 
 def legacy_keys(api):
     """0.4.0 keys (generation-based), only used to migrate existing threads."""
     accounts = _accounts(api)
-    return {r['account_id']: _digest([r['account_id'], accounts.get(r['account_id'], {}).get('generation', ''), r.get('endpoint', '')])
-            for r in routes(api)}
+    out = {}
+    for r in routes(api):
+        aid = _account_id(r)
+        if not aid:continue
+        record = accounts.get(aid, {}) or {}
+        generation = as_text(record.get('generation', ''), 'account.generation') if isinstance(record, dict) else ''
+        out[aid] = _digest([aid, generation, as_text(r.get('endpoint', ''), 'route.endpoint')])
+    return out
 
 
 def _slots(p):
@@ -227,7 +248,8 @@ def pending(p, api=None):
     threads = _slots(p)
     # With an explicit api that has no Copilot route, another provider's turn is
     # unrelated to the pending Copilot decision. The UI (api=None) still shows it.
-    candidates = list(keys(api).values()) if api is not None else list(threads.keys())
+    candidates = [as_key(k) for k in (keys(api).values() if api is not None else threads.keys())]
+    candidates = [k for k in candidates if k]
     for key in candidates:
         slot = threads.get(key)
         if not valid(slot):
