@@ -110,7 +110,7 @@
         }
       ]
     },
-    "local_continuity_tests": "366 unit tests passed, 2 skipped; synthetic fixtures only; Tk/Xvfb not run"
+    "local_continuity_tests": "369 unit tests passed, 2 skipped; synthetic fixtures only; Tk/Xvfb not run"
   },
   "fixes": [
     "Project file library, reading state, version/provenance and route-scoped excerpt grants",
@@ -174,7 +174,7 @@
     "uncertain_result": "keeps identifiers and requires an explicit user decision; never silently re-sends or rebinds",
     "revocation": "requires an explicit clean-thread decision; sent material remains in Microsoft",
     "server_recall_verified": false,
-    "local_tests": "366 passed / 2 skipped; no authenticated Microsoft session",
+    "local_tests": "369 passed / 2 skipped; no authenticated Microsoft session",
     "no_api_key": {
       "api_key_field_hidden": true,
       "save_account_starts_m365_connection": true,
@@ -192,7 +192,7 @@
     "files": 111,
     "runtime_only": true,
     "internal_sha256sums": true,
-    "tests_run_against_extracted_package": "366 passed / 2 skipped",
+    "tests_run_against_extracted_package": "369 passed / 2 skipped",
     "tk_interface_executed": false,
     "ready_to_use": {
       "quickstart": "LEER-PRIMERO.txt",
@@ -202,7 +202,8 @@
       "external_requirement": "Python >=3.11 with Tkinter and SQLite; package installs nothing",
       "bundled_dependencies": "websocket-client and pypdf vendored in the package"
     },
-    "self_check_branches_tested": "failure (Tk missing on Linux) and success (Tk simulated)"
+    "self_check_branches_tested": "failure (Tk missing on Linux) and success (Tk simulated)",
+    "self_check_marker": "longdraft-1 + \"Borradores largos: OK\""
   },
   "response_format": {
     "single_complete_json_object": true,
@@ -246,5 +247,6 @@
     "one_retry_only": true,
     "http_400_response_format_relaxed_once": true,
     "error_reason_redacted": true
-  }
+  },
+  "build": "longdraft-1"
 }

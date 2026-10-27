@@ -7,7 +7,7 @@ import hashlib
 import importlib
 import sys
 from pathlib import Path
-from version import VERSION
+from version import VERSION, BUILD
 
 ROOT = Path(__file__).resolve().parent
 CORE = ('agent', 'autonomy', 'bibliography', 'config', 'context_policy',
@@ -35,9 +35,33 @@ def check_data_dir():
     return []
 
 
+def check_long_draft():
+    """Functional proof that THIS copy accepts the user's long task reply.
+
+    The recurring "La respuesta no cumple el formato académico" was caused by a
+    10000-character cap in an older build. Running this at startup tells the user
+    immediately whether they opened the corrected ZIP or a stale folder.
+    """
+    import json
+    from limits import MAX_DRAFT_CHARS
+    from agent import unpack
+    text = ('### Marco teórico\n\n'
+            + 'Párrafo de prueba con acentos, 3.º de secundaria y\n\n'
+            * 260)
+    raw = json.dumps({'text': text, 'sources': [],
+                      'reply': 'Borrador de prueba, sin fuentes.'}, ensure_ascii=False)
+    assert len(json.loads(raw)['text']) > 10000
+    result = unpack(raw, {'section': 'marco_teorico'})
+    drafts = result.get('drafts', [])
+    if (len(drafts) != 1 or drafts[0]['section'] != 'marco_teorico'
+            or len(drafts[0]['text']) <= 10000):
+        return ['Esta copia sigue rechazando borradores largos: descarga el ZIP nuevo y descomprímelo en una carpeta vacía.']
+    return []
+
+
 def main():
     problems = []
-    print(f'Nexo Tesis {VERSION} - comprobacion local (sin red)')
+    print(f'Nexo Tesis {VERSION} ({BUILD}) - comprobacion local (sin red)')
     print('Python:', sys.version.split()[0])
     if sys.version_info < (3, 11):
         problems.append('Se requiere Python 3.11 o superior.')
@@ -85,6 +109,16 @@ def main():
         problems.append('Falta SQLite: ' + str(e)[:100])
 
     problems += check_data_dir()
+    try:
+        draft_issues = check_long_draft()
+    except Exception as e:
+        problems.append('No se pudo comprobar el validador de borradores: ' + type(e).__name__ + ' ' + str(e)[:100])
+    else:
+        if draft_issues:
+            problems += draft_issues
+        else:
+            from limits import MAX_DRAFT_CHARS
+            print('Borradores largos: OK (hasta ' + str(MAX_DRAFT_CHARS) + ' caracteres).')
     if problems:
         print('')
         print('PROBLEMAS ENCONTRADOS:')

@@ -72,8 +72,17 @@ queda intacta.
 Nuevas: `tests/test_borrador_largo_v041.py` (11 casos, incluido el marco
 teórico real de 11 000 caracteres de extremo a extremo y uno de 30 000 con
 recorte visible) y `tests/test_errores_http_v041.py` (5 casos). Total local:
-**366 superadas / 2 omitidas**. Las respuestas se generaron con fixtures; no
+**369 superadas / 2 omitidas**. Las respuestas se generaron con fixtures; no
 hubo sesión autenticada de Microsoft ni Word real.
+
+## Cómo confirmar que se está usando la copia corregida
+
+`VERIFICAR.cmd` imprime ahora el identificador de compilación
+`(longdraft-1)` y ejecuta una comprobación funcional: genera una respuesta de
+tarea con un `text` de más de 10 000 caracteres, la pasa por `unpack` y exige
+que produzca un borrador. Si la línea «Borradores largos: OK» no aparece, el
+usuario está abriendo una carpeta antigua, no el ZIP corregido. Esto evita
+seguir diagnosticando un código que no es el que se está ejecutando.
 
 ## Qué debe hacer el usuario
 

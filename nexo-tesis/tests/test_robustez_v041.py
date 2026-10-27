@@ -312,4 +312,5 @@ class PreflightTests(unittest.TestCase):
     def test_selfcheck_reports_version(self):
         text = (ROOT / 'verificar_instalacion.py').read_text('utf-8')
         self.assertIn('from version import VERSION', text)
-        self.assertIn('{VERSION} - comprobacion local', text)
+        self.assertIn('({BUILD}) - comprobacion local', text)
+        self.assertIn('from version import VERSION, BUILD', text)

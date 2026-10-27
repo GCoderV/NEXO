@@ -158,3 +158,32 @@ class NormalizationTests(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+class SelfCheckTests(unittest.TestCase):
+    def test_startup_check_proves_long_drafts_are_accepted(self):
+        from verificar_instalacion import check_long_draft
+        self.assertEqual(check_long_draft(), [])
+
+    def test_build_label_matches_metadata(self):
+        from version import VERSION, BUILD
+        meta = json.loads((ROOT / 'VERSION.json').read_text('utf-8'))
+        self.assertEqual(meta['version'], VERSION)
+        self.assertEqual(meta['build'], BUILD)
+        self.assertEqual(BUILD, 'longdraft-1')
+
+    def test_exact_shape_of_the_user_reply(self):
+        # Same top-level keys and escaped-newline markdown as the reported reply.
+        section = ('### Marco teórico\n\nLa enseñanza del inglés como lengua '
+                   'extranjera en 3.º de secundaria del Centro Educativo.\n\n'
+                   '- **Fluidez:** continuidad del mensaje.\n\n'
+                   '- **Interacción oral:** preguntas y respuestas.\n\n')
+        text = section * 60
+        raw = json.dumps({'text': text, 'sources': [],
+                          'reply': 'Se entrega el marco teórico completo.'}, ensure_ascii=False)
+        parsed = json.loads(raw)
+        self.assertGreater(len(parsed['text']), 10000)
+        self.assertIn('\\n', raw)  # saltos escapados, como en la respuesta real
+        r = unpack(raw, TASK)
+        self.assertEqual(r['drafts'][0]['section'], 'marco_teorico')
+        self.assertGreater(len(r['drafts'][0]['text']), 10000)

@@ -52,7 +52,9 @@ Las librerías `websocket` y `pypdf` ya vienen incluidas: no hay que instalar na
   alias en español y fuentes irregulares, y prompt que informa del límite.
   También se curan automáticamente el 404 de modelo Gemini obsoleto y el 400
   por `response_format`, con una sola repetición segura en cada caso.
-- Pruebas locales: 366 superadas / 2 omitidas con fixtures sintéticas.
+- El verificador de arranque muestra `(longdraft-1)` y comprueba de
+  forma funcional que un borrador de más de 10 000 caracteres se acepta.
+- Pruebas locales: 369 superadas / 2 omitidas con fixtures sintéticas.
 - **NO verificado**: sesión real de Copilot, recuerdo del servidor, Word COM,
   DPAPI, PowerShell de Windows ni la interfaz Tk en este entorno.
 - La cabecera `X-RoutingParameter-SessionKey` es evidencia de terceros sin

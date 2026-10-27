@@ -21,7 +21,7 @@ Código y contexto para continuar el desarrollo en una sesión limpia.
 >
 > **Descarga (build de desarrollo, no release):**
 > [nexo-tesis-v0.4.1-dev-windows.zip](releases/nexo-tesis-v0.4.1-dev-windows.zip)
-> (598,601 bytes, 114 archivos). SHA-256: `53e0db6c6339e1c23c811b9d5d56433fd4d94c4774fc5dcde520a5454b305226`.
+> (600,261 bytes, 114 archivos). SHA-256: `492262320f6236a125723488420138cd122d743f6572bdf422c8f1e12a5e3c40`.
 > **Corregido el error «La respuesta no cumple el formato académico» en
 > apartados largos**: límites unificados en `limits.py` (borrador de 20 000
 > caracteres), recorte visible en vez de rechazo y normalización de etiquetas,
@@ -29,7 +29,9 @@ Código y contexto para continuar el desarrollo en una sesión limpia.
 > por `response_format`. Además incluye la auditoría de robustez.
 > Informes: [INCIDENCIA-FORMATO-BORRADOR.md](contexto/INCIDENCIA-FORMATO-BORRADOR.md)
 > y [AUDITORIA-ROBUSTEZ.md](contexto/AUDITORIA-ROBUSTEZ.md).
-> 366 pruebas superadas / 2 omitidas. Ver `LEER-PRIMERO.txt`.
+> 369 pruebas superadas / 2 omitidas. `VERIFICAR.cmd` debe mostrar
+> `(longdraft-1)` y «Borradores largos: OK» para confirmar la copia correcta.
+> Ver `LEER-PRIMERO.txt`.
 > **Listo para usar:** descomprimir en una carpeta vacía y hacer doble clic en
 > `INICIAR-TESIS.cmd` (se autoverifica y abre la app). Requiere Python 3.11+ con
 > Tkinter; no instala nada. Incluye `LEER-PRIMERO.txt`, `VERIFICAR.cmd`, aviso de

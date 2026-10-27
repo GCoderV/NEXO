@@ -66,6 +66,21 @@ Para continuar SIN reiniciar el conjunto:
    Indica exactamente que parte de la respuesta no se pudo usar, sin mostrar
    el contenido del modelo.
 
+COMO SABER SI TIENES LA VERSION CORREGIDA
+-----------------------------------------
+Haz doble clic en VERIFICAR.cmd . En la pantalla debe aparecer:
+
+    Nexo Tesis 0.4.1-dev (longdraft-1) - comprobacion local (sin red)
+    ...
+    Borradores largos: OK (hasta 20000 caracteres).
+    Todo correcto.
+
+Si NO aparece la linea "Borradores largos: OK" o no dice
+"(longdraft-1)", estas abriendo una copia VIEJA de Nexo. Cierra la
+aplicacion, descarga el ZIP nuevo y descomprimelo en una carpeta VACIA.
+Tus proyectos NO estan dentro de esa carpeta: estan en
+%USERPROFILE%\.nexo-tesis y se conservan.
+
 COMPROBACIONES ANTES DE ABRIR
 -----------------------------
 INICIAR-TESIS.cmd revisa el paquete, Python 3.11+, Tkinter, SQLite y que tu
