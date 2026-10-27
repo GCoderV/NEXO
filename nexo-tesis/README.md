@@ -241,17 +241,18 @@ nunca se modifica. Ideas funcionales de proyectos abiertos (DoThesis, Loopy,
 agentic-thesis-writing, Academic Writing Toolkit, OpenDraft) en
 `AGENTE-LOOP-Y-DOCUMENTO.md`, incluido en este paquete.
 
-`VERIFICAR.cmd` muestra `(fase6-4)` y ejecuta siete comprobaciones
+`VERIFICAR.cmd` muestra `(fase6-5)` y ejecuta ocho comprobaciones
 funcionales sin red: borradores largos, consultas largas + planificador, un
 bucle completo del agente con exportación válida, el núcleo de las fases 1–6,
 la prueba de que una sesión Copilot capturada **no se cierra**, la de que el
-agente **pregunta por el corpus** en vez de rellenar Conclusiones y la de que un
-**proyecto nuevo no hereda el anterior**.
-**492 pruebas** superadas / 2 omitidas con fixtures sintéticas. Sin verificación real de Tk, Word COM,
+agente **pregunta por el corpus** en vez de rellenar Conclusiones, la de que un
+**proyecto nuevo no hereda el anterior** y la de que el **modo autónomo no
+agota su presupuesto** entre pasos.
+**499 pruebas** superadas / 2 omitidas con fixtures sintéticas. Sin verificación real de Tk, Word COM,
 DPAPI, Microsoft 365 Copilot ni de que Word abra el DOCX generado en este
 entorno.
 
-## Reconstrucción por fases (build `fase6-4`)
+## Reconstrucción por fases (build `fase6-5`)
 
 Tras el error real `cannot use 'dict' as a dict key (unhashable type: 'dict')`
 (mensaje nuevo de Python 3.14) y una ventana blanca huérfana de Copilot/Edge, se
@@ -284,8 +285,8 @@ Academic Writing Toolkit, analizadas con metodología REA. Detalle completo en
   calidad adjuntas. Ocultar un apartado conserva su borrador.
 - **Fase 5 — UI.** Pestaña Documento con estado M1–M5, «Agente continuo · hasta
   terminar», confirmar módulo, deshacer, recibo y diagnóstico.
-- **Fase 6 — Validación.** 492 pruebas / 2 omitidas. `VERIFICAR.cmd` muestra
-  `(fase6-4)` y ejecuta siete comprobaciones funcionales sin red, incluidos un
+- **Fase 6 — Validación.** 499 pruebas / 2 omitidas. `VERIFICAR.cmd` muestra
+  `(fase6-5)` y ejecuta ocho comprobaciones funcionales sin red, incluidos un
   bucle continuo que termina por verificación, la comprobación de que Copilot
   sigue abierto tras capturar la sesión y la frontera de datos empíricos.
 - **fase6-3 — Frontera empírica.** `empirical.py` es la única fuente de verdad
@@ -303,6 +304,14 @@ Academic Writing Toolkit, analizadas con metodología REA. Detalle completo en
   deja un lienzo en blanco; `refresh_document()` limpia el recibo huérfano;
   `new_project()` no anuncia éxito si no pudo abrir el proyecto. Los datos del
   proyecto anterior **no se borran**: al volver a abrirlo siguen ahí.
+- **fase6-5 — Modo autónomo con Copilot.** `attempt_limit` y `cycle_seconds`
+  son un presupuesto de **failover por petición**, pero se acumulaban en el
+  `RoutedAPI` que el bucle reutiliza en cada paso: el séptimo fallaba con «No
+  quedan rutas listas…» y una respuesta larga se cortaba a los 90 s. Cada
+  `request()` reinicia ahora su propio `cycle_attempts`/`cycle_start` (los
+  totales siguen en el recibo), y Copilot recibe todo el ciclo restante como
+  timeout. No es una cuota de pasos: `RunProfile.max_passes=None` sigue
+  vigente, con reloj, estancamiento, fusible y Detener como topes.
 
 **Uso del modo continuo:** Documento → «Agente continuo · hasta terminar» →
 aprobar el conjunto. Verás y autorizarás cada consulta antes de que salga a la

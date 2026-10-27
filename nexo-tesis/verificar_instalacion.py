@@ -455,6 +455,90 @@ def check_project_isolation():
     return issues
 
 
+def check_autonomous_budget():
+    """Offline proof: Copilot autonomous mode no longer dies after ~6 passes.
+
+    `attempt_limit`/`cycle_seconds` are a failover budget for ONE request.
+    The same RoutedAPI is reused for every pass of the agent loop, so an
+    accumulated budget used to abort pass 7 with "No quedan rutas listas...".
+    Verified here with a fake provider: no network and no credentials.
+    """
+    import base64
+    import json as _json
+    import tempfile
+    from config import Config
+    from routing import RoutedAPI
+
+    class Protector:
+        def seal(self, value): return value
+        def open(self, value): return value
+
+    class Provider:
+        def __init__(self, provider, key, model, endpoint, timeout):
+            self.provider = provider; self.key = key; self.model = model
+            self.endpoint = endpoint; self.timeout = timeout
+            self.instructions = ''; self.stop = None; self.remote = {}
+            self.project_id = ''; self.last_usage = {}
+
+        def request(self, conversation, declarations):
+            return ({'role': 'assistant', 'content': '{}'}, '{}', [])
+
+    issues = []
+    with tempfile.TemporaryDirectory() as folder:
+        cfg = Config(folder, Protector())
+        aid = cfg.account('Groq', 'comprobacion', 'CLAVE-SINTETICA')
+        rid = cfg.route('Groq', 'modelo', aid)
+        cfg.select(rid); cfg.memory[aid] = 'CLAVE-SINTETICA'
+        cfg.data['attempt_limit'] = 1
+        seen = []
+
+        def factory(provider, key, model, endpoint, timeout):
+            seen.append(timeout)
+            return Provider(provider, key, model, endpoint, timeout)
+
+        api = RoutedAPI(cfg, cfg.candidates(), factory)
+        try:
+            for i in range(9):
+                api.request([{'role': 'user', 'content': 'paso ' + str(i)}], [])
+        except Exception as exc:
+            issues.append('El bucle autónomo se detuvo antes de 9 pasos: ' +
+                          type(exc).__name__ + ' ' + str(exc)[:90])
+        if len(seen) != 9:
+            issues.append('El presupuesto de intentos se agotó entre pasos: ' +
+                          str(len(seen)) + ' de 9 peticiones.')
+        # Copilot streams long JSON: its per-attempt timeout must exceed the
+        # old 90s cap and stay within the configured cycle budget.
+        body = {'oid': 'fixture', 'tid': 'fixture',
+                'exp': 4102444800}
+        token = 'fixture.' + base64.urlsafe_b64encode(
+            _json.dumps(body).encode()).decode().rstrip('=') + '.signature'
+        from copilot_socket import sanitize_frame
+        frame = {'type': 4, 'target': 'chat', 'arguments': [{
+            'source': 'officedesktop', 'message': {'text': 'x', 'author': 'user'}}]}
+        secret = _json.dumps({
+            'url': 'wss://substrate.office.com/m365Copilot/Chathub/?access_token=' + token,
+            'frame': sanitize_frame(frame)})
+        aid2 = cfg.account('Copilot365', 'comprobacion', secret)
+        rid2 = cfg.route('Copilot365', 'auto', aid2)
+        cfg.select(rid2); cfg.memory[aid2] = secret
+        cfg.data['cycle_seconds'] = 180
+        seen2 = []
+
+        def factory2(provider, key, model, endpoint, timeout):
+            seen2.append(timeout)
+            return Provider(provider, key, model, endpoint, timeout)
+
+        try:
+            RoutedAPI(cfg, cfg.candidates(), factory2).request(
+                [{'role': 'user', 'content': 'x'}], [])
+        except Exception as exc:
+            issues.append('No se pudo comprobar el timeout de Copilot: ' +
+                          type(exc).__name__)
+        if seen2 and (seen2[0] <= 90 or seen2[0] > 180):
+            issues.append('Timeout de Copilot inesperado: ' + str(seen2[0]))
+    return issues
+
+
 def main():
     problems = []
     print(f'Nexo Tesis {VERSION} ({BUILD}) - comprobacion local (sin red)')
@@ -569,6 +653,15 @@ def main():
             problems += isolation_issues
         else:
             print('Aislamiento de proyectos: OK (un proyecto nuevo no hereda el anterior).')
+    try:
+        budget_issues = check_autonomous_budget()
+    except Exception as e:
+        problems.append('No se pudo comprobar el modo autonomo: ' + type(e).__name__ + ' ' + str(e)[:100])
+    else:
+        if budget_issues:
+            problems += budget_issues
+        else:
+            print('Modo autonomo: OK (el presupuesto de rutas no se agota entre pasos).')
     if problems:
         print('')
         print('PROBLEMAS ENCONTRADOS:')

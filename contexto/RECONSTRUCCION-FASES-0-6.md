@@ -1,6 +1,6 @@
 # Reconstrucción de Nexo Tesis · Fases 0–6
 
-**Build:** `0.4.1-dev (fase6-4)` · **Estado:** build de desarrollo, no release.
+**Build:** `0.4.1-dev (fase6-5)` · **Estado:** build de desarrollo, no release.
 **Alcance:** Nexo Tesis únicamente. Nexo PC 0.6.0 no se modifica.
 
 ---
@@ -230,7 +230,7 @@ frontera que faltaba en el anfitrión:
 reproducción exacta del JSON: el bucle se detiene con `stopped='pregunta'` tras
 **1** llamada al modelo (antes quemaba hasta 300), no guarda el borrador
 provisional, no duplica la pregunta, respeta el anteproyecto y no pregunta
-mientras queden apartados redactables. Suite completa: **492 pruebas OK /
+mientras queden apartados redactables. Suite completa: **499 pruebas OK /
 2 omitidas**. `VERIFICAR.cmd` incorpora `check_empirical_boundary()`.
 
 **Reparación colateral.** `tests/test_v040.py` buscaba el paquete 0.3.1 de
@@ -289,11 +289,74 @@ el proyecto B no muestra ningún marcador de A, los valores por defecto se
 restauran, el estado de sesión queda vacío, volver a A no pierde nada, el
 modelo no recibe datos de A, `refresh_document()` limpia el recibo y no se crea
 un proyecto que no se puede abrir. `VERIFICAR.cmd` añade
-`check_project_isolation()`. Suite completa: **492 pruebas OK / 2 omitidas**.
+`check_project_isolation()`. Suite completa: **499 pruebas OK / 2 omitidas**.
 
 **Límite honesto.** El doble de Tk conserva texto y opciones, pero no es un
 servidor X ni un widget real: no se ha verificado el repintado visual en
 Windows. La lógica de aislamiento sí se ejecutó contra la `Application` real.
+
+### Corrección posterior (build `fase6-5`): el modo autónomo se apagaba con Copilot
+
+**Síntoma real.** «Funciona bien hasta que lo pongan en modo autónomo. Ahí
+funciona un rato y luego deja de funcionar con Copilot. No sé si es que no
+espera la respuesta». El usuario adjuntó el prompt del **paso 2/12** y una
+respuesta válida con `escribir_apartado('metodologia', …)` de varios miles de
+caracteres.
+
+**Reproducción.** Con un `RoutedAPI` real y un proveedor sintético, 12
+peticiones secuenciales sobre el mismo objeto fracasaban en la **7.ª**:
+
+```
+paso 7: FALLO -> ProviderError: No quedan rutas listas o se alcanzó el
+        límite del ciclo. La petición queda disponible en Reanudar.
+attempts acumulados = 6, limite = 6
+timeouts por intento: [90, 90, 90, 90, 90, 90]
+```
+
+**Causa raíz.** No era un problema de redacción ni de espera del_socket:
+
+1. `routing.RoutedAPI.request()` guardaba `self.attempts` y `self.started` como
+   estado **acumulativo de la instancia**. `attempt_limit` (6) y
+   `cycle_seconds` (180 s) son el presupuesto de **failover de UNA petición**,
+   pero `app.start_agent_loop()` / `start_continuous()` crean **un solo**
+   `RoutedAPI` y el bucle llama a `request()` una vez por paso. En el paso 7 el
+   presupuesto estaba agotado y el `Agent` capturaba el `ProviderError` como
+   «Paso pendiente… pulsa Reanudar»: el bucle parecía muerto.
+2. El timeout por intento estaba topado en `min(90, remaining)`. Copilot
+   transmite por WebSocket un JSON largo (el apartado de Metodología del
+   reporte supera los 6 000 caracteres); a 90 s la respuesta podía cortarse a
+   mitad del objeto, `unpack()` no encontraba un JSON completo y el bucle
+   también se detenía.
+3. Con respuestas de 30–60 s, `cycle_seconds=180` se consumía además en 3–6
+   pasos, agravando (1). Con Copilot esto era mucho más visible que con una API
+   REST rápida.
+
+Se descartó el límite de contexto: midiendo instrucciones + contexto en un
+bucle de 12 pasos con 18 fuentes, 5 borradores y guía adjunta, el prompt se
+mantuvo estable en ~11 KB (muy por debajo de `MAX_CONTEXT_CHARS=40000` y del
+tope de 60 000 de `copilot_socket.complete`). El modo bucle además **nunca**
+usa el contexto incremental de Copilot, así que no se perdía historial remoto.
+
+**Corrección.** En `routing.py`, cada `request()` reinicia
+`cycle_attempts`/`cycle_start` y usa ese presupuesto local; `self.attempts` y
+`self.calls` siguen acumulándose para el recibo y los diagnósticos. Para
+`Copilot365` el `cap` del timeout pasa de 90 s a todo el `cycle_seconds`
+restante, de modo que una sección larga termina de llegar. El failover dentro
+de una petición sigue limitado por `attempt_limit`; los topes del bucle
+(reloj, estancamiento tras cambio de estrategia, fusible, pregunta al usuario,
+Detener) no se tocan y **`max_passes=None` sigue sin cuota de pasos**.
+
+**Pruebas.** 6 casos nuevos en `tests/test_modo_autonomo_v044.py`: 12 pasos no
+agotan el presupuesto, el reloj se reinicia por petición (con reloj simulado),
+Copilot recibe >90 s, el límite por petición sigue activo para failover, un
+bucle `Agent.turn(loop=…)` de **12 pasos con `RoutedAPI` real** llega al final
+y el autochequeo está cableado. `VERIFICAR.cmd` añade
+`check_autonomous_budget()`. Suite completa: **499 pruebas OK / 2 omitidas**.
+
+**Límite honesto.** Ninguna prueba usa una sesión M365 real ni un WebSocket de
+Microsoft: el proveedor es un doble sintético. No se ha medido el tiempo real
+de generación de Copilot en el equipo del usuario; el nuevo timeout es un
+margen, no una garantía de que el servidor responda antes.
 
 ### Fase 1 — Núcleo de estado
 `project_state.py`: cinco módulos M1–M5, `commit_slice()` como única vía de
@@ -390,13 +453,17 @@ cuota) y un bucle continuo que **termina por verificación**.
 ## 4. Cómo probarlo en el equipo
 
 1. Descomprime el ZIP en una carpeta vacía y ejecuta `VERIFICAR.cmd`.
-   Debe decir `(fase6-4)` y siete líneas `OK`, incluidas
-   «Datos empiricos: OK (pregunta al usuario; no rellena Conclusiones)» y
-   «Aislamiento de proyectos: OK (un proyecto nuevo no hereda el anterior)».
-   Si faltan esas líneas, estás abriendo un ZIP viejo (`fase6-3` o anterior).
+   Debe decir `(fase6-5)` y ocho líneas `OK`, incluidas
+   «Modo autonomo: OK (el presupuesto de rutas no se agota entre pasos)»,
+   «Aislamiento de proyectos: OK» y «Datos empiricos: OK».
+   Si faltan esas líneas, estás abriendo un ZIP viejo (`fase6-4` o anterior).
 2. Abre `INICIAR-TESIS.cmd`, usa un proyecto de prueba sin datos personales.
    Crea un segundo proyecto: debe empezar en blanco, sin el recibo del agente
    ni los límites del anterior. Al volver al primero, sus datos siguen ahí.
+2b. Modo autónomo: Documento → «Agente continuo · hasta terminar» con Copilot.
+   Debe superar el séptimo paso sin «No quedan rutas listas…». Si una respuesta
+   tarda más de lo habitual, espera: el timeout por paso ahora es de hasta
+   180 s (o el valor de «Tiempo del ciclo» en Modelos y cuentas).
 3. Si aparece un error, pulsa **«Copiar diagnóstico»** y pega el JSON: contiene
    el traceback redactado, la versión de Python/Tk y la forma del estado, sin el
    contenido de la tesis.

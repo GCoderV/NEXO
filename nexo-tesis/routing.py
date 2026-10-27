@@ -27,22 +27,33 @@ class RoutedAPI:
             if route['id']==rid:route['model']=model
         self.emit('Modelo obsoleto sustituido por '+model+'; se conservó la misma cuenta.')
     def request(self,conversation,declarations):
+        # attempt_limit / cycle_seconds are a FAILOVER BUDGET FOR ONE REQUEST,
+        # not a quota for the whole agent turn. The same RoutedAPI instance is
+        # reused for every pass of the autonomous loop (bounded or continuous),
+        # so accumulating `attempts` and `started` made Copilot die after ~6
+        # passes or 3 minutes with "No quedan rutas listas...". Each pass must
+        # get its own budget; totals are still kept in self.attempts/calls for
+        # the receipt and diagnostics.
         if self.started is None:self.started=time.monotonic()
         self.last_usage={};last=None
         limit=max(1,min(30,int(self.config.data.get('attempt_limit',6))))
         budget=max(10,min(600,int(self.config.data.get('cycle_seconds',180))))
+        cycle_start=time.monotonic();cycle_attempts=0
         for r in self.routes:
             if self.stop.is_set():raise RuntimeError('Detenido; no se iniciaron más peticiones.')
-            remaining=budget-(time.monotonic()-self.started)
-            if self.attempts>=limit or remaining<1:break
+            remaining=budget-(time.monotonic()-cycle_start)
+            if cycle_attempts>=limit or remaining<1:break
             aid=r['account_id'];rid=r['id']
             if self.config.data['cooldowns'].get(rid,0)>time.time():continue
             if self.config.data['health'].get(aid)=='auth':continue
             key=self.config.route_key(r)
             if key is None:continue
             alias=self.config.data['accounts'].get(aid,{}).get('alias','Local')
-            self.emit(f"Intento {self.attempts+1}/{limit} · {r['provider']} · {alias} · {r['model']}")
-            api=self.factory(r['provider'],key,r['model'],r['endpoint'],max(10,min(90,int(remaining))))
+            self.emit(f"Intento {cycle_attempts+1}/{limit} · {r['provider']} · {alias} · {r['model']}")
+            # Copilot streams long JSON sections over a WebSocket; a 90s cap cut
+            # the answer off mid-object. Give it the whole remaining cycle.
+            cap=budget if r['provider']=='Copilot365' else 90
+            api=self.factory(r['provider'],key,r['model'],r['endpoint'],max(10,min(cap,int(remaining))))
             api.timeout=max(1,min(api.timeout,remaining));api.instructions=self.instructions;api.stop=self.stop
             api.remote=self.remote.setdefault(aid,{}) if aid else {};api.project_id=self.project_id
             if r['provider']=='Gemini':api.on_model_fix=lambda new,rid=rid:self._apply_model_fix(rid,new)
@@ -64,7 +75,7 @@ class RoutedAPI:
                 api.update_secret=update
             text='\n'.join(m.get('content','') for m in conversation)
             payload=[{'role':'user','parts':[{'text':text}]}] if r['provider']=='Gemini' else conversation
-            self.attempts+=1;self.calls+=1
+            cycle_attempts+=1;self.attempts+=1;self.calls+=1
             try:
                 response=api.request(payload,declarations)
                 if aid:

@@ -529,6 +529,11 @@ class Agent:
                 allowed={m['ref'] for m in p.get('materials',[]) if scopes(self.api) and set(scopes(self.api))<=set(m.get('shared_routes',[]))}
                 # Siempre se construye el contexto completo: aplica permisos y límites
                 # incluso cuando solo se enviarán los cambios a un hilo verificado.
+                # op['notice'] carries the previous pass receipt + strategy
+                # nudge as `research_result`. loop_instructions() also shows it
+                # in its tail; keep both so a provider that ignores system
+                # instructions still sees what the last tools returned. It is
+                # bounded to 4 KB in _loop_pass, so it cannot grow forever.
                 full=context(p,user_text,allow_research and not op['searched'],op['notice'],origin,op.get('task'),material,allowed)
                 text=full
                 if not op.get('force_full') and not op.get('loop') and conversation_state.can_increment(p,self.api):

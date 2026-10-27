@@ -118,10 +118,23 @@ class RoutingTests(unittest.TestCase):
         self.ready();seen=[];api=RoutedAPI(self.c,self.c.candidates(),self.factory([ProviderError('timeout','uncertain'),reply()],seen))
         with self.assertRaises(ProviderError):api.request([],[])
         self.assertEqual(len(seen),1)
-    def test_attempt_budget_across_two_phases(self):
-        self.ready();self.c.data['attempt_limit']=1;seen=[];api=RoutedAPI(self.c,self.c.candidates(),self.factory([reply(),reply()],seen));api.request([],[])
+    def test_attempt_budget_is_per_request_not_per_agent_loop(self):
+        # Regression: the SAME RoutedAPI is reused for every pass of the
+        # autonomous loop. attempt_limit/cycle_seconds are a FAILOVER budget
+        # for ONE request, so pass 2 must not inherit pass 1's spent attempt.
+        # Accumulating them killed Copilot autonomous mode on pass 7 with
+        # "No quedan rutas listas o se alcanzó el límite del ciclo".
+        self.ready();self.c.data['attempt_limit']=1;seen=[]
+        api=RoutedAPI(self.c,self.c.candidates(),self.factory([reply(),reply()],seen))
+        api.request([],[]);api.request([],[])
+        self.assertEqual(len(seen),2,'cada paso del bucle necesita su propio presupuesto')
+        self.assertEqual(api.attempts,2,'los totales siguen acumulándose para el recibo')
+
+    def test_attempt_limit_still_bounds_failover_within_one_request(self):
+        self.ready();self.c.data['attempt_limit']=1;seen=[]
+        api=RoutedAPI(self.c,self.c.candidates(),self.factory([ProviderError('x','quota',True,100),reply()],seen))
         with self.assertRaises(ProviderError):api.request([],[])
-        self.assertEqual(len(seen),1)
+        self.assertEqual(len(seen),1,'el límite por petición sigue activo')
     def test_cancelled_before_first_request(self):
         self.ready();seen=[];api=RoutedAPI(self.c,self.c.candidates(),self.factory([reply()],seen));api.stop.set()
         with self.assertRaises(RuntimeError):api.request([],[])

@@ -101,11 +101,19 @@ Las librerías `websocket` y `pypdf` ya vienen incluidas: no hay que instalar na
   el documento completo sigue siendo offline y sin dependencias.
 - FASE 5: pestaña Documento con estado M1–M5, confirmación y deshacer,
   recibo auditable, diálogos con dueño y una sola ventana.
-- FASE 6: `VERIFICAR.cmd` muestra `(fase6-4)` y ejecuta SIETE comprobaciones
+- FASE 6: `VERIFICAR.cmd` muestra `(fase6-5)` y ejecuta OCHO comprobaciones
   funcionales sin red, incluidos un bucle continuo que termina por verificación,
   «Sesion Copilot: OK» (prueba con dobles de que la sesión NO se cierra),
   «Datos empiricos: OK» (el agente pregunta por el corpus, no rellena) y
-  «Aislamiento de proyectos: OK» (un proyecto nuevo no hereda el anterior).
+  «Aislamiento de proyectos: OK» (un proyecto nuevo no hereda el anterior) y
+  «Modo autonomo: OK» (el presupuesto de rutas no se agota entre pasos).
+- **fase6-5 (CORRECCIÓN): el modo autónomo con Copilot YA NO se apaga.**
+  `routing.py` reinicia `attempt_limit`/`cycle_seconds` en CADA petición en vez
+  de acumularlos durante todo el bucle: antes el paso 7 fallaba con «No quedan
+  rutas listas…». Copilot recibe ahora todo el ciclo restante como timeout
+  (antes 90 s), para que un apartado largo no se corte en streaming. El bucle
+  continuo **sin cuota de pasos** queda intacto. 6 pruebas nuevas, incluido un
+  bucle de 12 pasos con `RoutedAPI` real.
 - **fase6-4 (CORRECCIÓN): un proyecto NUEVO no asume nada del anterior.**
   `app.py` incorpora `reset_project_scope()`, que se ejecuta al abrir o crear
   un proyecto: borra el recibo del agente, el apartado seleccionado, los límites
@@ -121,7 +129,7 @@ Las librerías `websocket` y `pypdf` ya vienen incluidas: no hay que instalar na
   provisional hasta el fusible. `gates.py` bloquea placeholders semánticos
   («no existen evidencias empíricas…»). Un anteproyecto sigue pudiendo
   terminar sin resultados. Ver RECONSTRUCCION-FASES-0-6.md.
-- Pruebas locales: 492 superadas / 2 omitidas con fixtures sintéticas.
+- Pruebas locales: 499 superadas / 2 omitidas con fixtures sintéticas.
 - Ideas funcionales de DoThesis, Loopy, agentic-thesis-writing y Academic
   Writing Toolkit, analizadas con metodología REA (ver
   RECONSTRUCCION-FASES-0-6.md, incluido en este paquete).

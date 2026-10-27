@@ -21,9 +21,9 @@ Código y contexto para continuar el desarrollo en una sesión limpia.
 >
 > **Descarga (build de desarrollo, no release):**
 > [nexo-tesis-v0.4.1-dev-windows.zip](releases/nexo-tesis-v0.4.1-dev-windows.zip)
-> (125 archivos, build `fase6-4`). Página autónoma con el ZIP embebido (sin
+> (125 archivos, build `fase6-5`). Página autónoma con el ZIP embebido (sin
 > GitHub ni servidor): [descarga/descargar-nexo-tesis.html](descarga/descargar-nexo-tesis.html).
-> SHA-256: `78bbd0f30bd91afd7f4211dcbd6c2805fd55428ad95a53d6cd5e4e1d6566f92a`.
+> SHA-256: PENDIENTE.
 >
 > **Reconstrucción Fases 0–6.** Se corrigió el error real
 > `cannot use 'dict' as a dict key` (mensaje de Python 3.14) con un log de
@@ -61,9 +61,18 @@ Código y contexto para continuar el desarrollo en una sesión limpia.
 > bucle previo. 7 pruebas nuevas con un doble de Tk en memoria.
 > Ver `contexto/RECONSTRUCCION-FASES-0-6.md`.
 >
-> 492 pruebas superadas / 2 omitidas. `VERIFICAR.cmd` debe mostrar `(fase6-4)`
-> y siete líneas `OK`, incluidas «Datos empíricos: OK» y
-> «Aislamiento de proyectos: OK».
+> **Corrección `fase6-5`:** el modo autónomo con Copilot ya no se detiene tras
+> unos pocos pasos. `attempt_limit` y `cycle_seconds` son un presupuesto de
+> **failover por petición**, pero se acumulaban en el `RoutedAPI` que el bucle
+> reutiliza para los 12 pasos: el paso 7 fallaba con «No quedan rutas listas…»
+> y las respuestas largas se cortaban por un tope de 90 s. Ahora cada paso
+> tiene su propio presupuesto y Copilot recibe todo el ciclo restante como
+> timeout. El bucle continuo **sin cuota de pasos** queda intacto. 6 pruebas
+> nuevas, incluido un bucle de 12 pasos con `RoutedAPI` real.
+>
+> 499 pruebas superadas / 2 omitidas. `VERIFICAR.cmd` debe mostrar `(fase6-5)`
+> y ocho líneas `OK`, incluidas «Datos empíricos: OK»,
+> «Aislamiento de proyectos: OK» y «Modo autónomo: OK».
 >
 > **Listo para usar:** descomprimir en una carpeta vacía y hacer doble clic en
 > `INICIAR-TESIS.cmd` (se autoverifica y abre la app). Requiere Python 3.11+ con

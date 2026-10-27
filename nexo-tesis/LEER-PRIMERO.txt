@@ -142,11 +142,21 @@ hechos, borradores, fuentes y recibos siguen ahi. Si ves datos de otra
 tesis en un proyecto nuevo, ejecuta VERIFICAR.cmd: debe decir
 "Aislamiento de proyectos: OK".
 
+MODO AUTONOMO CON COPILOT
+-------------------------
+Si el agente autonomo se detenia despues de unos pocos pasos con
+"No quedan rutas listas o se alcanzo el limite del ciclo", ya esta
+corregido: el presupuesto de reintentos se reinicia en CADA paso, no
+se consume durante todo el bucle. Ademas Copilot tiene ahora hasta
+180 segundos por respuesta (antes 90), para que un apartado largo no
+se corte a la mitad. Si una respuesta tarda, ESPERA: no es un fallo.
+Puedes detener el bucle cuando quieras con el boton Detener.
+
 COMO SABER SI TIENES LA VERSION CORREGIDA
 -----------------------------------------
 Haz doble clic en VERIFICAR.cmd . En la pantalla debe aparecer:
 
-    Nexo Tesis 0.4.1-dev (fase6-4) - comprobacion local (sin red)
+    Nexo Tesis 0.4.1-dev (fase6-5) - comprobacion local (sin red)
     ...
     Borradores largos: OK (hasta 20000 caracteres).
     Busqueda y plan: OK (consultas largas + apartados pendientes).
@@ -155,10 +165,11 @@ Haz doble clic en VERIFICAR.cmd . En la pantalla debe aparecer:
     Sesion Copilot: OK (no se cierra tras capturar; solo se limpian fallos).
     Datos empiricos: OK (pregunta al usuario; no rellena Conclusiones).
     Aislamiento de proyectos: OK (un proyecto nuevo no hereda el anterior).
+    Modo autonomo: OK (el presupuesto de rutas no se agota entre pasos).
     Todo correcto.
 
-Si NO aparecen las SIETE lineas "OK" o no dice
-"(fase6-4)", estas abriendo una copia VIEJA de Nexo. Cierra la
+Si NO aparecen las OCHO lineas "OK" o no dice
+"(fase6-5)", estas abriendo una copia VIEJA de Nexo. Cierra la
 aplicacion, descarga el ZIP nuevo y descomprimelo en una carpeta VACIA.
 Tus proyectos NO estan dentro de esa carpeta: estan en
 %USERPROFILE%\.nexo-tesis y se conservan.

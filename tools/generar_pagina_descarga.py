@@ -40,7 +40,7 @@ BODY = """<body><main>
 <p class="meta">{size} bytes · {files} archivos · <span id="hash">verificando integridad…</span></p>
 <p class="meta">SHA-256 esperado: <code>{sha}</code></p>
 
-<div class="news"><strong>Novedad de esta copia ({build}):</strong> <strong>un proyecto nuevo YA NO asume nada del proyecto anterior.</strong> Al crear o abrir otro proyecto se borran el recibo del agente, el apartado seleccionado, los límites del modo agente, los permisos de búsqueda, los consentimientos y el texto pendiente: cada proyecto empieza verdaderamente en blanco (los datos guardados del proyecto anterior se conservan al volver a abrirlo). Esto corrige el caso en que el bot parecía seguir trabajando con la universidad, población o método de la tesis previa. También siguen corregidos: el agente continuo <strong>no rellena Conclusiones sin datos</strong> (pregunta por el corpus; <em>fase6-3</em>) y Copilot <strong>no se cierra</strong> tras capturar la sesión (<em>fase6-2</em>) —déjalo abierto mientras uses la cuenta—. Se mantienen el agente continuo sin cuota de pasos, la búsqueda de fuentes en Crossref y la pestaña <strong>Documento</strong> (Markdown, HTML y DOCX sin Word ni internet). <strong>Para confirmar que abres esta copia:</strong> ejecuta <code>VERIFICAR.cmd</code> y comprueba que dice <code>({build})</code> y las siete líneas <code>OK</code>, incluidas <em>«Datos empiricos: OK»</em> y <em>«Aislamiento de proyectos: OK»</em>. Si no aparecen, estás usando una carpeta antigua.</div>
+<div class="news"><strong>Novedad de esta copia ({build}):</strong> <strong>el modo autónomo con Copilot YA NO se detiene después de unos pocos pasos.</strong> El presupuesto de reintentos se reinicia en <em>cada</em> paso del bucle (antes se agotaba en el séptimo con «No quedan rutas listas…»), y Copilot espera hasta 180 s por respuesta en vez de 90 s, para que un apartado largo no se corte a la mitad. Si una respuesta tarda, <strong>espera</strong>: no es un fallo. El bucle continuo <strong>sin cuota de pasos</strong> sigue intacto. También siguen corregidos: un proyecto nuevo <strong>no asume nada del anterior</strong> (<em>fase6-4</em>), el agente <strong>no rellena Conclusiones sin datos</strong> —pregunta por el corpus— (<em>fase6-3</em>) y Copilot <strong>no se cierra</strong> tras capturar la sesión (<em>fase6-2</em>) —déjalo abierto mientras uses la cuenta—. Se mantienen la búsqueda de fuentes en Crossref y la pestaña <strong>Documento</strong> (Markdown, HTML y DOCX sin Word ni internet). <strong>Para confirmar que abres esta copia:</strong> ejecuta <code>VERIFICAR.cmd</code> y comprueba que dice <code>({build})</code> y las ocho líneas <code>OK</code>, incluidas <em>«Modo autonomo: OK»</em>, <em>«Aislamiento de proyectos: OK»</em> y <em>«Datos empiricos: OK»</em>. Si no aparecen, estás usando una carpeta antigua.</div>
 
 <div class="box">
 <strong>Si el botón no descarga</strong> (algunos visores bloquean descargas):
@@ -109,7 +109,7 @@ def build():
             '<meta name="viewport" content="width=device-width,initial-scale=1">\n'
             '<title>Descarga directa · Nexo Tesis 0.4.1-dev</title>\n'
             '<style>' + CSS + '</style>\n</head>\n' +
-            BODY.format(build='fase6-4', b64=base64.b64encode(data).decode('ascii'),
+            BODY.format(build='fase6-5', b64=base64.b64encode(data).decode('ascii'),
                         size='{:,}'.format(len(data)).replace(',', '.'), files=files, sha=sha))
     OUT.parent.mkdir(parents=True, exist_ok=True)
     OUT.write_text(page, 'utf-8')
