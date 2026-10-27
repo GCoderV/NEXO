@@ -241,15 +241,16 @@ nunca se modifica. Ideas funcionales de proyectos abiertos (DoThesis, Loopy,
 agentic-thesis-writing, Academic Writing Toolkit, OpenDraft) en
 `AGENTE-LOOP-Y-DOCUMENTO.md`, incluido en este paquete.
 
-`VERIFICAR.cmd` muestra `(fase6-2)` y ejecuta cinco comprobaciones
+`VERIFICAR.cmd` muestra `(fase6-3)` y ejecuta seis comprobaciones
 funcionales sin red: borradores largos, consultas largas + planificador, un
-bucle completo del agente con exportación válida, el núcleo de las fases 1–6 y
-la prueba de que una sesión Copilot capturada **no se cierra**. **476 pruebas** superadas /
-2 omitidas con fixtures sintéticas. Sin verificación real de Tk, Word COM,
+bucle completo del agente con exportación válida, el núcleo de las fases 1–6,
+la prueba de que una sesión Copilot capturada **no se cierra** y la de que el
+agente **pregunta por el corpus** en vez de rellenar Conclusiones.
+**485 pruebas** superadas / 2 omitidas con fixtures sintéticas. Sin verificación real de Tk, Word COM,
 DPAPI, Microsoft 365 Copilot ni de que Word abra el DOCX generado en este
 entorno.
 
-## Reconstrucción por fases (build `fase6-2`)
+## Reconstrucción por fases (build `fase6-3`)
 
 Tras el error real `cannot use 'dict' as a dict key (unhashable type: 'dict')`
 (mensaje nuevo de Python 3.14) y una ventana blanca huérfana de Copilot/Edge, se
@@ -282,10 +283,17 @@ Academic Writing Toolkit, analizadas con metodología REA. Detalle completo en
   calidad adjuntas. Ocultar un apartado conserva su borrador.
 - **Fase 5 — UI.** Pestaña Documento con estado M1–M5, «Agente continuo · hasta
   terminar», confirmar módulo, deshacer, recibo y diagnóstico.
-- **Fase 6 — Validación.** 476 pruebas / 2 omitidas. `VERIFICAR.cmd` muestra
-  `(fase6-2)` y ejecuta cinco comprobaciones funcionales sin red, incluidos un
-  bucle continuo que termina por verificación y la comprobación de que Copilot
-  sigue abierto tras capturar la sesión.
+- **Fase 6 — Validación.** 485 pruebas / 2 omitidas. `VERIFICAR.cmd` muestra
+  `(fase6-3)` y ejecuta seis comprobaciones funcionales sin red, incluidos un
+  bucle continuo que termina por verificación, la comprobación de que Copilot
+  sigue abierto tras capturar la sesión y la frontera de datos empíricos.
+- **fase6-3 — Frontera empírica.** `empirical.py` es la única fuente de verdad
+  para decidir si el trabajo requiere resultados (un anteproyecto no), si hay
+  corpus confirmado y si un borrador es texto provisional. Cuando ya no queda
+  otro trabajo, `run_loop.evaluate()` para con `pregunta` y registra una
+  pregunta concreta sobre los datos; `gates.check_empirical()` bloquea
+  Conclusiones de relleno. El agente continuo **sin cuota de pasos** sigue
+  intacto: esto es una frontera humana, no un límite de pasos.
 
 **Uso del modo continuo:** Documento → «Agente continuo · hasta terminar» →
 aprobar el conjunto. Verás y autorizarás cada consulta antes de que salga a la

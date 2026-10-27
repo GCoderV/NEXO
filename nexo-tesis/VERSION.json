@@ -111,7 +111,8 @@
       ]
     },
     "local_continuity_tests": "369 unit tests passed, 2 skipped; synthetic fixtures only; Tk/Xvfb not run",
-    "fase6_2_tests": "476 passed / 2 skipped; 11 new synthetic regressions for the Copilot-close policy; no Windows/M365 verification"
+    "fase6_2_tests": "476 passed / 2 skipped; 11 new synthetic regressions for the Copilot-close policy; no Windows/M365 verification",
+    "fase6_3_tests": "485 passed / 2 skipped; 8 new synthetic regressions for the empirical-data boundary; reported turn stops after 1 model call instead of burning the 300-call fuse; no Windows/M365 verification"
   },
   "fixes": [
     "Project file library, reading state, version/provenance and route-scoped excerpt grants",
@@ -127,7 +128,8 @@
     "Tolerancia de formato: se valida un unico objeto JSON completo aunque venga envuelto en texto o cerca json, se unifican los contratos de tarea e incremental y el aviso de error indica un motivo fijo sin volcar la respuesta del modelo",
     "Auditoria de robustez: config concurrente con RLock e instantanea, cuarentena de config danado, ids F#/D# monotonos, proyecto legacy normalizado, expiracion Copilot tolerante, bookkeeping de rutas sin perder respuestas, version unica y preflight de carpeta de datos",
     "Correccion del error real de formato en borradores largos (Marco teorico): limites unificados en limits.py, recorte visible en vez de rechazo, normalizacion de apartados/alias/fuentes, prompt con limite explicito, curacion de modelo Gemini 404 y reintento seguro ante 400 por response_format",
-    "fase6-2: Nexo ya no cierra Copilot/Edge tras capturar la sesion. process_guard.detach_all()/guarded_capture() conservan el proceso en exito; close_all() solo limpia huérfanos en fallo/cancelacion; el dialogo nunca cierra la sesion"
+    "fase6-3: Nexo ya no cierra Copilot/Edge tras capturar la sesion. process_guard.detach_all()/guarded_capture() conservan el proceso en exito; close_all() solo limpia huérfanos en fallo/cancelacion; el dialogo nunca cierra la sesion",
+    "fase6-3: el agente continuo ya no rellena Resultados/Discusion/Conclusiones con texto provisional cuando faltan datos. empirical.py decide si el trabajo requiere corpus, detecta placeholders semanticos y run_loop.evaluate() para con pregunta en cuanto no queda otro trabajo; gates.check_empirical() bloquea el relleno; un anteproyecto sigue pudiendo terminar sin resultados"
   ],
   "autonomy": {
     "opt_in_batch": true,
@@ -187,15 +189,15 @@
     },
     "session_kept_open_after_capture": true
   },
-  "release_status": "development build at releases/nexo-tesis-v0.4.1-dev-windows.zip (fase6-2: captured Copilot session is NOT closed; long-draft format fix, HTTP recovery, robustness audit, Fases 0-6); NOT a published release; remote Copilot continuity unverified",
+  "release_status": "development build at releases/nexo-tesis-v0.4.1-dev-windows.zip (fase6-3: empirical chapters require a confirmed corpus and the continuous agent asks the user instead of writing filler; fase6-2 keeps Copilot open after capture; Fases 0-6 core); NOT a published release; remote Copilot continuity unverified",
   "development_package": {
     "file": "releases/nexo-tesis-v0.4.1-dev-windows.zip",
     "prefix": "Nexo-Tesis-0.4.1-dev/",
     "builder": "tools/empaquetar_tesis.py",
-    "files": 124,
+    "files": 125,
     "runtime_only": true,
     "internal_sha256sums": true,
-    "tests_run_against_extracted_package": "476 passed / 2 skipped",
+    "tests_run_against_extracted_package": "485 passed / 2 skipped",
     "tk_interface_executed": false,
     "ready_to_use": {
       "quickstart": "LEER-PRIMERO.txt",
@@ -206,8 +208,9 @@
       "bundled_dependencies": "websocket-client and pypdf vendored in the package"
     },
     "self_check_branches_tested": "failure (Tk missing on Linux) and success (Tk simulated)",
-    "self_check_marker": "fase6-2 + 5 lineas OK (borradores, busqueda, herramientas, fases 1-6, sesion Copilot)",
-    "self_check_copilot_close_regression": true
+    "self_check_marker": "fase6-3 + 6 lineas OK (borradores, busqueda, herramientas, fases 1-6, sesion Copilot, datos empiricos)",
+    "self_check_copilot_close_regression": true,
+    "self_check_empirical_boundary": true
   },
   "response_format": {
     "single_complete_json_object": true,
@@ -262,7 +265,16 @@
       "Detener",
       "human question"
     ],
-    "in_place_research": "research.research_for with per-query approval, 4 APIs, provenance"
+    "in_place_research": "research.research_for with per-query approval, 4 APIs, provenance",
+    "empirical_boundary": {
+      "module": "empirical.py",
+      "requires_results": "false for anteproyecto/protocolo; true for empirical studies",
+      "confirmed_corpus": "data_ready AND facts.datos non-empty",
+      "placeholder_detection": "semantic markers, accent-folded; literal markers still in gates",
+      "stop_reason": "pregunta (human boundary, NOT a step quota)",
+      "hard_gate": "gates.check_empirical blocks filler and unconfirmed empirical drafts",
+      "proposal_exempt": true
+    }
   },
   "single_write_path": {
     "module": "project_state.commit_slice",
@@ -299,5 +311,5 @@
     "word_modified_by_agent": false,
     "research_report": "AGENTE-LOOP-Y-DOCUMENTO.md"
   },
-  "build": "fase6-2"
+  "build": "fase6-3"
 }

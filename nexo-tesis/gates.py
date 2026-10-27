@@ -150,10 +150,45 @@ def check_export(p):
     return hard, soft
 
 
+def check_empirical(p):
+    """No invented results and no polite filler where evidence belongs.
+
+    `document.write_section()` already refuses empirical drafts without a
+    confirmed corpus, but a draft can also arrive from the UI, an older project
+    or a corpus that is too thin. Literal markers ([Por redactar], TODO) are not
+    enough: the reported placeholder said "no existen evidencias empíricas..."
+    and passed every previous gate. Those sections must never count as finished.
+    """
+    import empirical
+    hard, soft = [], []
+    if not empirical.requires_results(p):
+        # An anteproyecto legitimately has "resultados esperados"; never block it.
+        return hard, soft
+    drafts = _drafts(p)
+    written = [s for s in empirical.EMPIRICAL if s in drafts]
+    if written and not empirical.confirmed(p):
+        hard.append('Secciones empíricas redactadas SIN corpus confirmado: ' +
+                    ', '.join(LABELS.get(s, s) for s in written) +
+                    '. Aporta los datos del estudio o elimina el texto; no se '
+                    'redactarán resultados sin evidencia.')
+    for section in written:
+        if empirical.placeholder(drafts[section]['text']):
+            hard.append(LABELS.get(section, section) +
+                        ' contiene texto provisional sin evidencia: reescríbelo '
+                        'con los datos confirmados o pregunta al usuario por el '
+                        'corpus. No se exportará como apartado terminado.')
+    if not empirical.confirmed(p):
+        soft.append('Faltan datos/corpus confirmados en Memoria: el agente debe '
+                    'PREGUNTAR al usuario, no rellenar Resultados/Discusión/'
+                    'Conclusiones con texto provisional.')
+    return hard, soft
+
+
 def evaluate(p):
     """Return {'hard': [...], 'soft': [...], 'score': int}."""
     hard, soft = [], []
-    for check in (check_sources, check_numbers, check_coherence, check_export):
+    for check in (check_sources, check_numbers, check_coherence, check_export,
+                  check_empirical):
         try:
             h, s = check(p)
             hard += h
@@ -162,4 +197,4 @@ def evaluate(p):
             soft.append('No se pudo evaluar ' + check.__name__ + ': ' + type(exc).__name__)
     score = max(0, 100 - 12 * len(hard) - 3 * len(soft))
     return {'hard': hard, 'soft': soft, 'score': score,
-            'passes': not hard, 'checked': 4}
+            'passes': not hard, 'checked': 5}

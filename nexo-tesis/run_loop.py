@@ -36,6 +36,10 @@ STRATEGIES = (
     'sin datos, apartados incompletos) y corrígelas antes de seguir escribiendo.',
     'Cambia de estrategia: si falta información del usuario, llama '
     'preguntar_usuario con UNA pregunta concreta y espera su respuesta.',
+    'Cambia de estrategia: si Resultados/Discusión/Conclusiones siguen '
+    'pendientes y no hay corpus confirmado, NO escribas texto provisional ni '
+    'repitas escribir_apartado; llama preguntar_usuario con UNA pregunta '
+    'concreta sobre los datos del estudio.',
 )
 
 
@@ -96,9 +100,19 @@ def evaluate(p, state, profile=None, now_monotonic=None):
     profile = profile or RunProfile()
     clock = now_monotonic if now_monotonic is not None else time.monotonic()
     verification = verify(p, profile.include_optional)
-    result = {'stop': None, 'verification': verification, 'nudge': ''}
+    result = {'stop': None, 'verification': verification, 'nudge': '', 'question': ''}
     if verification['done']:
         result['stop'] = 'trabajo_completado'
+        return result
+    # HUMAN BOUNDARY (not a step quota): when the only work left needs a corpus
+    # from the user, stop and ASK. Otherwise the model keeps retrying blocked
+    # writes and burns calls through the stall/fuse limits. Host-decided, so a
+    # model that says "intento completar otro apartado" cannot override it.
+    import empirical
+    question = empirical.data_question(p, verification)
+    if question:
+        result['stop'] = 'pregunta'
+        result['question'] = question
         return result
     started = state.get('started_at')
     if started is not None and clock - started >= profile.max_seconds:
@@ -132,6 +146,7 @@ def receipt(p, state, profile=None, reason=''):
         'changes': state.get('changed', 0),
         'research_rounds': state.get('research_rounds', 0),
         'stopped': reason,
+        'question': state.get('question', ''),
         'actions': actions,
         'verification': {
             'done': verification.get('done'),

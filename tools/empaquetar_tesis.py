@@ -101,10 +101,18 @@ Las librerías `websocket` y `pypdf` ya vienen incluidas: no hay que instalar na
   el documento completo sigue siendo offline y sin dependencias.
 - FASE 5: pestaña Documento con estado M1–M5, confirmación y deshacer,
   recibo auditable, diálogos con dueño y una sola ventana.
-- FASE 6: `VERIFICAR.cmd` muestra `(fase6-2)` y ejecuta CINCO comprobaciones
-  funcionales sin red, incluidos un bucle continuo que termina por verificación
-  y «Sesion Copilot: OK» (prueba con dobles de que la sesión NO se cierra).
-- Pruebas locales: 476 superadas / 2 omitidas con fixtures sintéticas.
+- FASE 6: `VERIFICAR.cmd` muestra `(fase6-3)` y ejecuta SEIS comprobaciones
+  funcionales sin red, incluidos un bucle continuo que termina por verificación,
+  «Sesion Copilot: OK» (prueba con dobles de que la sesión NO se cierra) y
+  «Datos empiricos: OK» (el agente pregunta por el corpus, no rellena).
+- **fase6-3 (CORRECCIÓN): el agente continuo NO rellena Conclusiones sin
+  datos.** Si faltan Resultados/Discusión/Conclusiones y no hay corpus
+  confirmado, `empirical.py` detiene el bucle con UNA pregunta concreta al
+  usuario en cuanto no queda otro trabajo, en lugar de insistir con texto
+  provisional hasta el fusible. `gates.py` bloquea placeholders semánticos
+  («no existen evidencias empíricas…»). Un anteproyecto sigue pudiendo
+  terminar sin resultados. Ver RECONSTRUCCION-FASES-0-6.md.
+- Pruebas locales: 485 superadas / 2 omitidas con fixtures sintéticas.
 - Ideas funcionales de DoThesis, Loopy, agentic-thesis-writing y Academic
   Writing Toolkit, analizadas con metodología REA (ver
   RECONSTRUCCION-FASES-0-6.md, incluido en este paquete).
@@ -132,7 +140,7 @@ FORBIDDEN_NAMES = ('.gitignore', '.env', 'config.json', 'preferences.json',
 READY_EXTRAS = ('LEER-PRIMERO.txt', 'VERIFICAR.cmd', 'verificar_instalacion.py',
                 'version.py', 'limits.py', 'document.py', 'agent_tools.py',
                 'diagnostics.py', 'process_guard.py', 'project_state.py',
-                'gates.py', 'research.py', 'run_loop.py')
+                'gates.py', 'research.py', 'run_loop.py', 'empirical.py')
 
 
 def runtime_paths():

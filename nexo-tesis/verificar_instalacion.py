@@ -14,7 +14,7 @@ CORE = ('agent', 'autonomy', 'bibliography', 'config', 'context_policy',
         'conversation_state', 'copilot_metadata', 'copilot_socket', 'guide_rules',
         'materials', 'native_material', 'project_store', 'prompt_policy', 'providers',
         'document', 'agent_tools', 'diagnostics', 'process_guard',
-        'project_state', 'gates', 'research', 'run_loop',
+        'project_state', 'gates', 'research', 'run_loop', 'empirical',
         'routing', 'secrets_store', 'word_bridge', 'word_layout', 'pypdf', 'websocket')
 UI = ('app', 'material_dialog', 'settings_dialog', 'word_layout_dialog')
 
@@ -293,6 +293,64 @@ def check_copilot_stays_open():
     return issues
 
 
+def check_empirical_boundary():
+    """Offline proof: no invented results and no filler conclusions.
+
+    Reproduces the reported turn ("intento completar otro apartado pendiente no
+    basado en hallazgos del estudio") with synthetic projects. Verifies that
+    the host asks the user for a corpus instead of looping on blocked writes.
+    """
+    import tempfile
+    import empirical
+    import gates
+    import run_loop
+    from project_store import ProjectStore, set_fact
+
+    filler = ('Conclusiones (provisional). Este apartado permanece condicionado '
+              'a la obtención y análisis de datos del estudio. En la fase actual '
+              'no existen evidencias empíricas que permitan establecer '
+              'conclusiones. Toda afirmación permanece con apoyo pendiente.')
+    issues = []
+    if not empirical.placeholder(filler):
+        issues.append('No se detecta el texto provisional de Conclusiones.')
+
+    with tempfile.TemporaryDirectory() as data:
+        store = ProjectStore(data)
+        p = store.create('Tema de comprobacion local')
+        p['sources'] = [{'id': 'F1', 'title': 'Obra', 'doi': '10.1/x',
+                         'url': 'https://doi.org/10.1/x', 'status': 'metadatos'}]
+        set_fact(p, 'datos', 'Corpus de prueba: 68%')
+        p['data_ready'] = True
+        for key in ('delimitacion', 'problematica', 'pregunta', 'objetivos',
+                    'justificacion', 'marco_teorico', 'metodologia',
+                    'instrumentos', 'plan_accion', 'analisis_previsto',
+                    'cronograma', 'presupuesto', 'anexos', 'referencias'):
+            p['drafts'][key] = {'text': 'Contenido de comprobacion [F1]. ' * 6,
+                                'status': 'borrador', 'sources': ['F1']}
+        p['drafts']['conclusiones'] = {'text': filler, 'status': 'borrador',
+                                       'sources': []}
+        if not any('provisional' in x for x in gates.evaluate(p)['hard']):
+            issues.append('Las puertas aceptaron Conclusiones provisionales.')
+        del p['drafts']['conclusiones']
+
+        p['data_ready'] = False
+        p['facts'].pop('datos', None)
+        question = empirical.data_question(p)
+        if not question or 'corpus' not in question.lower():
+            issues.append('El agente no formula la pregunta sobre el corpus.')
+        decision = run_loop.evaluate(
+            p, {'passes': 1, 'stalls': 0},
+            run_loop.RunProfile(max_seconds=600, hard_fuse=40))
+        if decision['stop'] != 'pregunta':
+            issues.append('El bucle no se detiene a preguntar al usuario: ' +
+                          str(decision['stop']))
+
+        p['facts']['tipo_trabajo'] = {'value': 'Anteproyecto de investigacion'}
+        if empirical.data_question(p) is not None:
+            issues.append('Un anteproyecto no debe exigir resultados empiricos.')
+    return issues
+
+
 def main():
     problems = []
     print(f'Nexo Tesis {VERSION} ({BUILD}) - comprobacion local (sin red)')
@@ -389,6 +447,15 @@ def main():
             problems += copilot_issues
         else:
             print('Sesion Copilot: OK (no se cierra tras capturar; solo se limpian fallos).')
+    try:
+        empirical_issues = check_empirical_boundary()
+    except Exception as e:
+        problems.append('No se pudo comprobar la frontera de datos empiricos: ' + type(e).__name__ + ' ' + str(e)[:100])
+    else:
+        if empirical_issues:
+            problems += empirical_issues
+        else:
+            print('Datos empiricos: OK (pregunta al usuario; no rellena Conclusiones).')
     if problems:
         print('')
         print('PROBLEMAS ENCONTRADOS:')

@@ -380,6 +380,16 @@ class Agent:
                 export_dir=state['export_dir'],producer=state['producer'])
             decision=run_loop.evaluate(p,state,profile,now_monotonic=time.monotonic())
             state['verification']=decision['verification']
+            if decision.get('question'):
+                # Host-decided human boundary: make the data request visible in
+                # the project's question list (the UI already renders it) and in
+                # the auditable receipt. Never ask the same question twice.
+                q=decision['question'];state['question']=q
+                if not any(isinstance(item,dict) and item.get('status')=='abierta'
+                           and item.get('text')==q for item in p.get('questions',[])):
+                    p.setdefault('questions',[]).append({'id':'loop-'+now(),
+                        'key':'datos','text':q,'status':'abierta','clarify':False,
+                        'time':now(),'material_ids':[]})
             if decision['stop']:stop=decision['stop']
             elif decision['nudge']:
                 op['notice']=(receipt+'\n\nESTRATEGIA '+str(state['stalls'])+':\n'+decision['nudge'])[:4000]

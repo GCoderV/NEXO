@@ -330,7 +330,11 @@ def write_section(p, key, text, sources=(), producer='agente-loop'):
         raise ValueError('El texto del apartado está vacío.')
     old = p['drafts'].get(key)
     if key in EMPIRICAL and not (p.get('data_ready') and p['facts'].get('datos')):
-        raise ValueError('Faltan datos/corpus confirmados; no se redactarán resultados empíricos.')
+        raise ValueError('Faltan datos/corpus confirmados para ' + label(p, key) +
+                         '. NO escribas texto provisional ni insistas con '
+                         'escribir_apartado: llama preguntar_usuario(texto=...) con '
+                         'UNA pregunta concreta sobre los datos del estudio y espera '
+                         'la respuesta. No se inventarán resultados empíricos.')
     used = set(sources) | set(re.findall(r'\[([FD]\d+)\]', text))
     known = _known_ids(p)
     if not used <= known:

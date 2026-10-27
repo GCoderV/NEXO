@@ -21,9 +21,9 @@ Código y contexto para continuar el desarrollo en una sesión limpia.
 >
 > **Descarga (build de desarrollo, no release):**
 > [nexo-tesis-v0.4.1-dev-windows.zip](releases/nexo-tesis-v0.4.1-dev-windows.zip)
-> (124 archivos, build `fase6-2`). Página autónoma con el ZIP embebido (sin
+> (125 archivos, build `fase6-3`). Página autónoma con el ZIP embebido (sin
 > GitHub ni servidor): [descarga/descargar-nexo-tesis.html](descarga/descargar-nexo-tesis.html).
-> SHA-256: `958f4dc4a354d0c025ee7748aae860fd6ed8d08f3e9d2c42b3ca394fb3994cd7`.
+> SHA-256: `700edf488d01ba2f75598c74d6a02b915dfcb6df5a51cb0eefce1cd9cd3e5a03`.
 >
 > **Reconstrucción Fases 0–6.** Se corrigió el error real
 > `cannot use 'dict' as a dict key` (mensaje de Python 3.14) con un log de
@@ -43,8 +43,17 @@ Código y contexto para continuar el desarrollo en una sesión limpia.
 > procesos huérfanos cuando la conexión falla o se cancela. `VERIFICAR.cmd`
 > comprueba esta política con dobles sintéticos de `Popen`.
 >
-> 476 pruebas superadas / 2 omitidas. `VERIFICAR.cmd` debe mostrar `(fase6-2)`
-> y cinco líneas `OK`, incluida «Sesión Copilot: OK».
+> **Corrección `fase6-3`:** el agente continuo ya no rellena Resultados,
+> Discusión ni Conclusiones con texto provisional cuando faltan datos
+> empíricos. `empirical.py` decide si el trabajo requiere un corpus, detecta
+> placeholders semánticos («no existen evidencias empíricas…») y hace que el
+> bucle **pregunte al usuario** con una única pregunta concreta en cuanto no
+> queda otro trabajo, en vez de insistir hasta el fusible. Las puertas duras
+> bloquean esos apartados; un anteproyecto sigue pudiendo terminar sin
+> resultados. Detalle en `contexto/RECONSTRUCCION-FASES-0-6.md`.
+>
+> 485 pruebas superadas / 2 omitidas. `VERIFICAR.cmd` debe mostrar `(fase6-3)`
+> y seis líneas `OK`, incluidas «Sesión Copilot: OK» y «Datos empíricos: OK».
 >
 > **Listo para usar:** descomprimir en una carpeta vacía y hacer doble clic en
 > `INICIAR-TESIS.cmd` (se autoverifica y abre la app). Requiere Python 3.11+ con

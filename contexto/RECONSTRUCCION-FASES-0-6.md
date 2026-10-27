@@ -1,6 +1,6 @@
 # Reconstrucción de Nexo Tesis · Fases 0–6
 
-**Build:** `0.4.1-dev (fase6-2)` · **Estado:** build de desarrollo, no release.
+**Build:** `0.4.1-dev (fase6-3)` · **Estado:** build de desarrollo, no release.
 **Alcance:** Nexo Tesis únicamente. Nexo PC 0.6.0 no se modifica.
 
 ---
@@ -178,6 +178,71 @@ sandbox. La corrección se verificó con dobles, no con un proceso real. En el
 equipo del usuario, la comprobación es: capturar la sesión, cerrar el diálogo,
 enviar una solicitud y confirmar que la ventana de Copilot sigue abierta.
 
+### Corrección posterior (build `fase6-3`): rellenar Conclusiones sin datos
+
+**Síntoma real.** El usuario pegó esta salida del agente continuo:
+
+> «Persisten como pendientes Resultados, Discusión y Conclusiones. Dado que
+> Resultados no puede redactarse sin datos empíricos confirmados, intento
+> completar otro apartado pendiente no basado en hallazgos del estudio.»
+> → `escribir_apartado('conclusiones', 'Conclusiones (provisional). Este
+> apartado permanece condicionado a la obtención y análisis de datos…')`
+
+**Causa raíz.** No fue un problema de redacción del modelo, sino de una
+frontera que faltaba en el anfitrión:
+
+1. `document.write_section()` **ya rechazaba** escribir apartados empíricos sin
+   corpus confirmado. Pero `run_loop.evaluate()` no tenía ninguna salida
+   determinista para «lo único que falta son datos del usuario»: el modelo
+   recibía el error, cambiaba de estrategia y volvía a intentarlo hasta el
+   estancamiento o el fusible de 300 llamadas. La estrategia que sugería
+   `preguntar_usuario` era sólo texto que el modelo podía ignorar.
+2. `gates.PLACEHOLDER` sólo reconocía marcadores literales (`[Por redactar]`,
+   `TODO`, `TBD`, `Por definir`). Un placeholder **semántico** —«no existen
+   evidencias empíricas», «apoyo pendiente»— pasaba todas las puertas y podía
+   hacer que M4 se marcara como terminado con texto de relleno.
+3. `project_state.verify()` omite las secciones empíricas (un anteproyecto
+   legítimamente no las tiene), así que nada contabilizaba el relleno.
+
+**Corrección.** Nuevo módulo `empirical.py` como única fuente de verdad:
+
+| Decisión | Regla |
+| --- | --- |
+| ¿Hace falta evidencia? | `requires_results()` — falso para anteproyecto/protocolo, verdadero para un estudio empírico |
+| ¿Hay corpus? | `confirmed()` — exige `data_ready` **y** `facts.datos` no vacío |
+| ¿Es relleno? | `placeholder()` — detecta marcadores semánticos plegados sin acentos |
+| ¿Qué hacer? | `data_question()` — devuelve UNA pregunta concreta cuando ya no queda otro trabajo |
+
+- `run_loop.evaluate()` para con `stop='pregunta'` **antes** de los topes de
+  tiempo/fusible/estancamiento. Es una frontera humana, **no una cuota de
+  pasos**. `agent._loop_pass()` registra la pregunta en `p['questions']` (la UI
+  ya la muestra) y en el recibo auditable; no se pregunta dos veces.
+- `gates.check_empirical()` añade un bloqueo duro a los apartados empíricos con
+  texto provisional o escritos sin corpus, y un aviso cuando faltan datos.
+  `evaluate()` pasa a comprobar 5 grupos de reglas.
+- `document.write_section()` devuelve un error **accionable**: «NO escribas
+  texto provisional… llama `preguntar_usuario(texto=…)` con UNA pregunta
+  concreta sobre los datos del estudio».
+- Un anteproyecto sigue pudiendo terminar sin Resultados; la pregunta sólo
+  aparece si no queda ningún otro apartado/fuente por trabajar.
+
+**Pruebas.** 8 casos nuevos en `tests/test_datos_empiricos_v042.py`, incluida la
+reproducción exacta del JSON: el bucle se detiene con `stopped='pregunta'` tras
+**1** llamada al modelo (antes quemaba hasta 300), no guarda el borrador
+provisional, no duplica la pregunta, respeta el anteproyecto y no pregunta
+mientras queden apartados redactables. Suite completa: **485 pruebas OK /
+2 omitidas**. `VERIFICAR.cmd` incorpora `check_empirical_boundary()`.
+
+**Reparación colateral.** `tests/test_v040.py` buscaba el paquete 0.3.1 de
+referencia en `/home/user/`, un archivo temporal que desapareció al reiniciarse
+el sandbox. Ahora usa la copia **versionada** en `releases/` y se omite
+limpiamente si no existe.
+
+**Límite honesto.** Ninguna prueba usa un modelo real, Windows, Word, Tk con
+display ni una sesión M365. La detección de placeholders es léxica y
+determinista: puede tener falsos negativos ante una redacción ingeniosa, pero
+nunca inventa evidencia ni marca un apartado como terminado sin corpus.
+
 ### Fase 1 — Núcleo de estado
 `project_state.py`: cinco módulos M1–M5, `commit_slice()` como única vía de
 escritura, validación de propiedad/tipos/citas/datos empíricos, snapshot antes
@@ -273,9 +338,10 @@ cuota) y un bucle continuo que **termina por verificación**.
 ## 4. Cómo probarlo en el equipo
 
 1. Descomprime el ZIP en una carpeta vacía y ejecuta `VERIFICAR.cmd`.
-   Debe decir `(fase6-2)` y cinco líneas `OK`, incluida
-   «Sesion Copilot: OK (no se cierra tras capturar; solo se limpian fallos)».
-   Si falta esa línea, estás abriendo el ZIP viejo (`fase6-1`).
+   Debe decir `(fase6-3)` y seis líneas `OK`, incluidas
+   «Sesion Copilot: OK (no se cierra tras capturar; solo se limpian fallos)» y
+   «Datos empiricos: OK (pregunta al usuario; no rellena Conclusiones)».
+   Si faltan esas líneas, estás abriendo un ZIP viejo (`fase6-2` o anterior).
 2. Abre `INICIAR-TESIS.cmd`, usa un proyecto de prueba sin datos personales.
 3. Si aparece un error, pulsa **«Copiar diagnóstico»** y pega el JSON: contiene
    el traceback redactado, la versión de Python/Tk y la forma del estado, sin el

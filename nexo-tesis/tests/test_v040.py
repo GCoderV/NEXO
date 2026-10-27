@@ -151,7 +151,14 @@ class ThreadAndReferencesTests(unittest.TestCase):
         d=SignalDecoder();d.consume({'type':1,'arguments':[{'messages':[{'author':'bot','text':'Respuesta','sourceAttributions':[{'displayName':'Fuente','seeMoreUrl':'https://example.org/paper?token=SECRET','referenceId':'1'},{'url':'javascript:alert(1)'}]}]}]});self.assertEqual(d.text(),'Respuesta');self.assertEqual(len(d.citations),1);self.assertNotIn('SECRET',json.dumps(d.citations));self.assertIn('no verificado',d.citations[0]['status'])
     def test_launch_and_capture_functions_unchanged(self):
         import ast,zipfile
-        with zipfile.ZipFile('/home/user/nexo-tesis-v0.3.1-windows.zip') as z:old=z.read('Nexo-Tesis-0.3.1/copilot_socket.py').decode()
+        # The 0.3.1 reference package is COMMITTED in releases/. Older runs
+        # used a scratch copy in /home/user that disappeared on a sandbox
+        # restart; never depend on a file outside the repository again.
+        candidates=(Path(__file__).resolve().parents[2]/'releases'/'nexo-tesis-v0.3.1-windows.zip',
+                    Path('/home/user/nexo-tesis-v0.3.1-windows.zip'))
+        reference=next((c for c in candidates if c.is_file()),None)
+        if reference is None:self.skipTest('Paquete 0.3.1 de referencia no disponible.')
+        with zipfile.ZipFile(reference) as z:old=z.read('Nexo-Tesis-0.3.1/copilot_socket.py').decode()
         new=Path('copilot_socket.py').read_text()
         def funcs(s):return {n.name:ast.get_source_segment(s,n) for n in ast.parse(s).body if isinstance(n,ast.FunctionDef)}
         of,nf=funcs(old),funcs(new)
