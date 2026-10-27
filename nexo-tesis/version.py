@@ -5,4 +5,4 @@ still matches this constant. VERSION.json is metadata for the package.
 """
 PRODUCT = 'Nexo Tesis'
 VERSION = '0.4.1-dev'
-BUILD = 'fase6-3'
+BUILD = 'fase6-4'

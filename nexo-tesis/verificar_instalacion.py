@@ -351,6 +351,110 @@ def check_empirical_boundary():
     return issues
 
 
+def check_project_isolation():
+    """Offline proof: switching projects clears ALL project-scoped UI state.
+
+    Uses the real Application.reset_project_scope() on lightweight stubs, so
+    no display, Windows, Word or network is needed. Reproduces the reported
+    bug (a new project inheriting the previous one's agent receipt, section,
+    work-mode toggles, consents and pending text).
+    """
+    import queue
+    from app import Application
+    from project_store import SECTIONS
+
+    class Widget:
+        def __init__(self, value=''):
+            self.value = value
+            self.opts = {}
+            self.idx = -1
+            self.values = []
+            self.children = []
+
+        def configure(self, *a, **kw):
+            self.opts.update(kw)
+            if 'text' in kw:
+                self.value = kw['text']
+            if 'values' in kw:
+                self.values = list(kw['values'])
+
+        def cget(self, key):
+            return self.opts.get(key, '')
+
+        def delete(self, *a, **kw):
+            self.value = ''
+            self.children = []
+
+        def insert(self, index, text, *a):
+            self.value = text if index == '1.0' else self.value + text
+
+        def get(self, *a, **kw):
+            return self.value
+
+        def state(self, *a, **kw):
+            return []
+
+        def current(self, i=None):
+            if i is not None:
+                self.idx = i
+                self.value = self.values[i] if 0 <= i < len(self.values) else ''
+            return self.idx
+
+        def set(self, value):
+            self.value = value
+
+        def get_children(self, *a, **kw):
+            return list(self.children)
+
+    class Var:
+        def __init__(self, value=''):
+            self.value = value
+
+        def get(self):
+            return self.value
+
+        def set(self, value):
+            self.value = value
+
+    app = Application.__new__(Application)
+    app.busy = False
+    app.events = queue.Queue()
+    app.events.put(('status', 'aviso del proyecto anterior'))
+    for name in ('chat', 'memory_text', 'source_text', 'word_selection',
+                 'draft_text', 'input', 'word_proposal', 'title',
+                 'project_state', 'module_status', 'doc_status',
+                 'draft_status', 'doc_tree', 'draft_choice',
+                 'source_choice', 'word_choice'):
+        setattr(app, name, Widget('MARCA DEL PROYECTO ANTERIOR'))
+    for name in ('draft_key', 'auto_limit', 'loop_passes', 'include_optional',
+                 'continuous_research', 'continuous_minutes', 'allow_research'):
+        setattr(app, name, Var('anterior'))
+    app.draft_keys = ['anterior']
+    app.draft_loaded = 'borrador anterior'
+    app.documents = ['word-anterior.docx']
+    app.word_origin = ('anterior', 'texto')
+    app.input_origin = 'seleccion_word'
+    app.pending_user_text = ('id-anterior', 'texto anterior', 'usuario')
+    app.consent = {('firma-anterior', 'Groq', 'm', '')}
+    app.last_action = 'anterior'
+
+    app.reset_project_scope()
+    issues = []
+    for name in ('chat', 'memory_text', 'source_text', 'word_selection',
+                 'draft_text', 'input', 'word_proposal', 'doc_status'):
+        if getattr(app, name).get():
+            issues.append('El widget ' + name + ' conserva texto del proyecto anterior.')
+    if app.draft_key.get() != SECTIONS[0]:
+        issues.append('El apartado seleccionado no volvió al primero.')
+    if app.loop_passes.get() != '6' or app.continuous_minutes.get() != '60':
+        issues.append('Los límites del agente se heredaron del proyecto anterior.')
+    if app.consent or app.pending_user_text or app.documents or app.word_origin:
+        issues.append('Quedó estado de sesión del proyecto anterior.')
+    if not app.events.empty():
+        issues.append('Quedaron eventos pendientes del proyecto anterior.')
+    return issues
+
+
 def main():
     problems = []
     print(f'Nexo Tesis {VERSION} ({BUILD}) - comprobacion local (sin red)')
@@ -456,6 +560,15 @@ def main():
             problems += empirical_issues
         else:
             print('Datos empiricos: OK (pregunta al usuario; no rellena Conclusiones).')
+    try:
+        isolation_issues = check_project_isolation()
+    except Exception as e:
+        problems.append('No se pudo comprobar el aislamiento entre proyectos: ' + type(e).__name__ + ' ' + str(e)[:100])
+    else:
+        if isolation_issues:
+            problems += isolation_issues
+        else:
+            print('Aislamiento de proyectos: OK (un proyecto nuevo no hereda el anterior).')
     if problems:
         print('')
         print('PROBLEMAS ENCONTRADOS:')

@@ -191,7 +191,10 @@ class Application:
     def refresh_document(self):
         if not hasattr(self,'doc_tree'):return
         self.doc_tree.delete(*self.doc_tree.get_children())
-        if not self.project:return
+        if not self.project:
+            self.module_status.configure(text='MÓDULOS: abre un proyecto.')
+            self.doc_status.configure(text='')
+            return
         for e in document.outline(self.project):
             state=e['status'] if e['has_draft'] else 'sin borrador'
             self.doc_tree.insert('','end',iid=e['key'],values=(e['label'],state,e['chars'],'sí' if e['visible'] else 'no'))
@@ -204,6 +207,7 @@ class Application:
         last=self.project.get('last_loop')
         if last:self.doc_status.configure(text='Último agente: '+str(last.get('passes',0))+' pasos · '+str(last.get('changes',0))+' cambios · motivo: '+str(last.get('stopped','?'))+
             (' · ' + str(last.get('verification',{}).get('score','')) + '/100' if last.get('verification') else ''))
+        else:self.doc_status.configure(text='')  # never keep the previous project's receipt
     def generate_document(self):
         self.require_project();self.ensure_clean_draft()
         folder=filedialog.askdirectory(parent=self.root,title='Carpeta donde guardar el documento completo')
@@ -396,31 +400,89 @@ class Application:
         word_pending=bool(word_text.strip()) and (self.word_origin is None or word_text!=self.word_origin[1] or (self.bridge is not None and self.bridge.snapshot is not None))
         if changed or input_pending or word_pending:return messagebox.askyesno('Texto sin guardar','Hay texto pendiente en un apartado, mensaje o propuesta de Word. ¿Descartarlo y continuar?',parent=self.root)
         return True
+    def reset_project_scope(self):
+        """Erase ALL in-memory state scoped to a project before opening another.
+
+        Reported bug: "cuando creó un nuevo proyecto sigue asumiendo cosas del
+        proyecto anterior". The stored projects were ALREADY isolated
+        (ProjectStore.create() starts with empty facts/drafts/sources/messages),
+        but this Application kept the previous project's agent receipt, selected
+        section, work-mode toggles, consents, pending text and widget contents.
+        A new project therefore looked and behaved like the old one.
+
+        This is the single place that resets that scope. It runs only after the
+        user confirmed discarding unsaved text, and only when no job is running.
+        User-level settings (accounts/routes, window size, theme) are untouched.
+        """
+        if self.busy:
+            return
+        # Text widgets: readonly ones stay disabled, editable ones stay usable.
+        for name in ('chat','memory_text','source_text','word_selection'):
+            widget=getattr(self,name,None)
+            if widget is not None:self.put(widget,'',True)
+        for name in ('draft_text','input','word_proposal'):
+            widget=getattr(self,name,None)
+            if widget is not None:self.put(widget,'')
+        # Labels that describe the project, including the agent receipt.
+        for name,text in (('title','De una idea a un trabajo fundamentado'),
+                          ('project_state','Un tema es suficiente para empezar. El agente preguntará lo necesario.'),
+                          ('module_status','MÓDULOS: abre un proyecto.'),
+                          ('doc_status',''),
+                          ('draft_status','Todavía no hay borrador.')):
+            widget=getattr(self,name,None)
+            if widget is not None:widget.configure(text=text)
+        if hasattr(self,'doc_tree'):self.doc_tree.delete(*self.doc_tree.get_children())
+        # Selectors and per-project work defaults. A new project must not inherit
+        # the previous one's section, step count, research permission or limits.
+        self.draft_keys=list(SECTIONS);self.draft_loaded=''
+        self.draft_key.set(SECTIONS[0])
+        self.draft_choice.configure(values=[LABELS[k] for k in SECTIONS]);self.draft_choice.current(0)
+        self.source_choice.configure(values=());self.source_choice.set('')
+        self.word_choice.configure(values=());self.word_choice.set('')
+        self.auto_limit.set('6');self.loop_passes.set('6')
+        self.include_optional.set(True);self.continuous_research.set(True)
+        self.continuous_minutes.set('60');self.allow_research.set(False)
+        # Ephemeral session state: consents, pending input, Word selection.
+        self.documents=[];self.word_origin=None;self.input_origin='usuario'
+        self.pending_user_text=None;self.consent.clear()
+        if hasattr(self,'last_action'):self.last_action=''
+        # Drop stale events from a previous project (job completion/status).
+        try:
+            while True:self.events.get_nowait()
+        except queue.Empty:pass
+        return None
     def open_project(self,id):
         if self.busy:return
         if not self.unsaved_ok():self.refresh_projects();return
+        self.reset_project_scope()
         self.project=self.store.recover(self.store.load(id))
         if self.project.get('autonomy',{}).get('status')=='en_curso':
             from autonomy import save_session
             save_session(self.store,self.project,'interrumpido','La sesión anterior no se reinició automáticamente. Revisa los avances y la petición pendiente, si existe.')
         self.bridge=self.word_factory(self.store.root/'word-audit'/(id+'.jsonl'))
-        self.documents=[];self.word_origin=None;self.input_origin='usuario';self.word_choice.set('');self.word_choice.configure(values=());self.put(self.word_selection,'',True);self.put(self.word_proposal,'');self.put(self.input,'');self.allow_research.set(False)
         self.refresh_projects();self.render();self.tabs.select(0)
     def selected_project(self,event=None):
         if self.busy:return
         sel=self.projects.curselection()
         if sel and (not self.project or self.project_ids[sel[0]]!=self.project['id']):self.guard(lambda:self.open_project(self.project_ids[sel[0]]))
     def new_project(self,topic=None):
+        # Never create a project that cannot be opened: open_project() refuses
+        # while a job is running, and the old code still announced success.
+        if self.busy:return
         if not self.unsaved_ok():return
         if topic is None:topic=simpledialog.askstring('Nuevo proyecto','Escribe solamente el tema o título provisional:',parent=self.root)
         if not topic or not topic.strip():return
         p=self.store.create(topic)
         # Clear only after explicit discard/creation, to avoid double prompts.
-        self.put(self.input,'');self.draft_loaded=self.draft_text.get('1.0','end-1c');self.open_project(p['id']);self.status.set('Proyecto nuevo. Responde en el chat o pulsa Continuar. No se ha enviado nada a un modelo.')
+        self.put(self.input,'');self.draft_loaded=self.draft_text.get('1.0','end-1c');self.open_project(p['id'])
+        if self.project and self.project['id']==p['id']:
+            self.status.set('Proyecto nuevo. Responde en el chat o pulsa Continuar. No se ha enviado nada a un modelo.')
     def render(self):
-        self.chat.configure(state='normal');self.chat.delete('1.0','end')
         if not self.project:
+            self.reset_project_scope()  # no project open => no project-scoped state
+            self.chat.configure(state='normal');self.chat.delete('1.0','end')
             self.chat.insert('end','Tu tema, tu proyecto.\n\n','heading');self.chat.insert('end','Escribe un tema abajo o pulsa «Nuevo proyecto».\n\nEl agente te ayudará a delimitarlo, reunir fuentes y desarrollar los apartados. Hará las preguntas que necesite y conservará las decisiones de cada proyecto por separado.\n\nConfigura un modelo para conversar y redactar. Sin modelo puedes crear proyectos y consultar lo guardado; no se simula una investigación.');self.chat.configure(state='disabled');self.refresh_document();return
+        self.chat.configure(state='normal');self.chat.delete('1.0','end')
         p=self.project;self.title.configure(text=p['topic'][:180]+('…' if len(p['topic'])>180 else ''))
         state={'esperando_respuesta':'esperando tu respuesta','interrumpido':'interrumpido','listo':'listo','error':'revisa el último aviso','error_formato':'respuesta no estructurada: revisa el aviso','detenido':'detenido','sin_avance':'sin avance: revisa el aviso'}.get(p['run'].get('status'),'en curso')
         self.project_state.configure(text=f"{state} · {len(p['drafts'])} apartados · {len(p['sources'])} fuentes · {p['usage']['calls']} consultas al modelo")

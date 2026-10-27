@@ -21,9 +21,9 @@ Código y contexto para continuar el desarrollo en una sesión limpia.
 >
 > **Descarga (build de desarrollo, no release):**
 > [nexo-tesis-v0.4.1-dev-windows.zip](releases/nexo-tesis-v0.4.1-dev-windows.zip)
-> (125 archivos, build `fase6-3`). Página autónoma con el ZIP embebido (sin
+> (125 archivos, build `fase6-4`). Página autónoma con el ZIP embebido (sin
 > GitHub ni servidor): [descarga/descargar-nexo-tesis.html](descarga/descargar-nexo-tesis.html).
-> SHA-256: `700edf488d01ba2f75598c74d6a02b915dfcb6df5a51cb0eefce1cd9cd3e5a03`.
+> SHA-256: `78bbd0f30bd91afd7f4211dcbd6c2805fd55428ad95a53d6cd5e4e1d6566f92a`.
 >
 > **Reconstrucción Fases 0–6.** Se corrigió el error real
 > `cannot use 'dict' as a dict key` (mensaje de Python 3.14) con un log de
@@ -52,8 +52,18 @@ Código y contexto para continuar el desarrollo en una sesión limpia.
 > bloquean esos apartados; un anteproyecto sigue pudiendo terminar sin
 > resultados. Detalle en `contexto/RECONSTRUCCION-FASES-0-6.md`.
 >
-> 485 pruebas superadas / 2 omitidas. `VERIFICAR.cmd` debe mostrar `(fase6-3)`
-> y seis líneas `OK`, incluidas «Sesión Copilot: OK» y «Datos empíricos: OK».
+> **Corrección `fase6-4`:** un proyecto nuevo ya no asume nada del anterior.
+> Los proyectos guardados siempre estuvieron aislados; lo que se arrastraba era
+> el estado en memoria de la aplicación (recibo del último agente, apartado
+> seleccionado, límites del modo agente, permisos, consentimientos, texto
+> pendiente y widgets). `Application.reset_project_scope()` lo limpia al crear
+> o abrir un proyecto; `refresh_document()` borra el recibo cuando no hay
+> bucle previo. 7 pruebas nuevas con un doble de Tk en memoria.
+> Ver `contexto/RECONSTRUCCION-FASES-0-6.md`.
+>
+> 492 pruebas superadas / 2 omitidas. `VERIFICAR.cmd` debe mostrar `(fase6-4)`
+> y siete líneas `OK`, incluidas «Datos empíricos: OK» y
+> «Aislamiento de proyectos: OK».
 >
 > **Listo para usar:** descomprimir en una carpeta vacía y hacer doble clic en
 > `INICIAR-TESIS.cmd` (se autoverifica y abre la app). Requiere Python 3.11+ con

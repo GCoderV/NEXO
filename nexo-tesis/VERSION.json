@@ -112,7 +112,8 @@
     },
     "local_continuity_tests": "369 unit tests passed, 2 skipped; synthetic fixtures only; Tk/Xvfb not run",
     "fase6_2_tests": "476 passed / 2 skipped; 11 new synthetic regressions for the Copilot-close policy; no Windows/M365 verification",
-    "fase6_3_tests": "485 passed / 2 skipped; 8 new synthetic regressions for the empirical-data boundary; reported turn stops after 1 model call instead of burning the 300-call fuse; no Windows/M365 verification"
+    "fase6_3_tests": "492 passed / 2 skipped; 8 new synthetic regressions for the empirical-data boundary; reported turn stops after 1 model call instead of burning the 300-call fuse; no Windows/M365 verification",
+    "fase6_4_tests": "492 passed / 2 skipped; 7 new synthetic regressions for project isolation built on an in-memory Tk double; no display, Windows, Word or network verification"
   },
   "fixes": [
     "Project file library, reading state, version/provenance and route-scoped excerpt grants",
@@ -128,8 +129,9 @@
     "Tolerancia de formato: se valida un unico objeto JSON completo aunque venga envuelto en texto o cerca json, se unifican los contratos de tarea e incremental y el aviso de error indica un motivo fijo sin volcar la respuesta del modelo",
     "Auditoria de robustez: config concurrente con RLock e instantanea, cuarentena de config danado, ids F#/D# monotonos, proyecto legacy normalizado, expiracion Copilot tolerante, bookkeeping de rutas sin perder respuestas, version unica y preflight de carpeta de datos",
     "Correccion del error real de formato en borradores largos (Marco teorico): limites unificados en limits.py, recorte visible en vez de rechazo, normalizacion de apartados/alias/fuentes, prompt con limite explicito, curacion de modelo Gemini 404 y reintento seguro ante 400 por response_format",
-    "fase6-3: Nexo ya no cierra Copilot/Edge tras capturar la sesion. process_guard.detach_all()/guarded_capture() conservan el proceso en exito; close_all() solo limpia huérfanos en fallo/cancelacion; el dialogo nunca cierra la sesion",
-    "fase6-3: el agente continuo ya no rellena Resultados/Discusion/Conclusiones con texto provisional cuando faltan datos. empirical.py decide si el trabajo requiere corpus, detecta placeholders semanticos y run_loop.evaluate() para con pregunta en cuanto no queda otro trabajo; gates.check_empirical() bloquea el relleno; un anteproyecto sigue pudiendo terminar sin resultados"
+    "fase6-2: Nexo ya no cierra Copilot/Edge tras capturar la sesion. process_guard.detach_all()/guarded_capture() conservan el proceso en exito; close_all() solo limpia huérfanos en fallo/cancelacion; el dialogo nunca cierra la sesion",
+    "fase6-3: el agente continuo ya no rellena Resultados/Discusion/Conclusiones con texto provisional cuando faltan datos. empirical.py decide si el trabajo requiere corpus, detecta placeholders semanticos y run_loop.evaluate() para con pregunta en cuanto no queda otro trabajo; gates.check_empirical() bloquea el relleno; un anteproyecto sigue pudiendo terminar sin resultados",
+    "fase6-4: al crear/abrir un proyecto NO se arrastra el estado del anterior. Application.reset_project_scope() limpia el recibo del agente, el apartado seleccionado, los limites del modo agente, los permisos de investigacion, consentimientos, texto pendiente, eventos y todos los widgets; refresh_document() borra el recibo cuando no hay last_loop; new_project() no anuncia exito si open_project() no pudo cambiar de proyecto"
   ],
   "autonomy": {
     "opt_in_batch": true,
@@ -189,7 +191,7 @@
     },
     "session_kept_open_after_capture": true
   },
-  "release_status": "development build at releases/nexo-tesis-v0.4.1-dev-windows.zip (fase6-3: empirical chapters require a confirmed corpus and the continuous agent asks the user instead of writing filler; fase6-2 keeps Copilot open after capture; Fases 0-6 core); NOT a published release; remote Copilot continuity unverified",
+  "release_status": "development build at releases/nexo-tesis-v0.4.1-dev-windows.zip (fase6-4: a new project no longer inherits UI/agent state from the previous one; fase6-3 requires a confirmed corpus before empirical chapters; fase6-2 keeps Copilot open after capture; Fases 0-6 core); NOT a published release; remote Copilot continuity unverified",
   "development_package": {
     "file": "releases/nexo-tesis-v0.4.1-dev-windows.zip",
     "prefix": "Nexo-Tesis-0.4.1-dev/",
@@ -197,7 +199,7 @@
     "files": 125,
     "runtime_only": true,
     "internal_sha256sums": true,
-    "tests_run_against_extracted_package": "485 passed / 2 skipped",
+    "tests_run_against_extracted_package": "492 passed / 2 skipped",
     "tk_interface_executed": false,
     "ready_to_use": {
       "quickstart": "LEER-PRIMERO.txt",
@@ -208,9 +210,10 @@
       "bundled_dependencies": "websocket-client and pypdf vendored in the package"
     },
     "self_check_branches_tested": "failure (Tk missing on Linux) and success (Tk simulated)",
-    "self_check_marker": "fase6-3 + 6 lineas OK (borradores, busqueda, herramientas, fases 1-6, sesion Copilot, datos empiricos)",
+    "self_check_marker": "fase6-4 + 7 lineas OK (borradores, busqueda, herramientas, fases 1-6, sesion Copilot, datos empiricos, aislamiento de proyectos)",
     "self_check_copilot_close_regression": true,
-    "self_check_empirical_boundary": true
+    "self_check_empirical_boundary": true,
+    "self_check_project_isolation": true
   },
   "response_format": {
     "single_complete_json_object": true,
@@ -311,5 +314,28 @@
     "word_modified_by_agent": false,
     "research_report": "AGENTE-LOOP-Y-DOCUMENTO.md"
   },
-  "build": "fase6-3"
+  "build": "fase6-4",
+  "project_isolation": {
+    "stored_data": "ProjectStore.create() already empty per project",
+    "ui_reset": "Application.reset_project_scope() called by open_project() and render()",
+    "agent_defaults_reset": [
+      "include_optional",
+      "loop_passes",
+      "continuous_research",
+      "continuous_minutes",
+      "auto_limit",
+      "allow_research",
+      "draft_key"
+    ],
+    "session_state_reset": [
+      "consent",
+      "pending_user_text",
+      "documents",
+      "word_origin",
+      "input_origin",
+      "events"
+    ],
+    "receipt_label": "doc_status cleared when last_loop is absent",
+    "verified_with_real_tk": false
+  }
 }

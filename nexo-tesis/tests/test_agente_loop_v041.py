@@ -345,7 +345,7 @@ class StartupSelfCheckTests(unittest.TestCase):
         meta = json.loads((ROOT / 'VERSION.json').read_text('utf-8'))
         self.assertEqual(meta['version'], VERSION)
         self.assertEqual(meta['build'], BUILD)
-        self.assertEqual(BUILD, 'fase6-3')
+        self.assertEqual(BUILD, 'fase6-4')
 
 
 class AppWiringTests(unittest.TestCase):

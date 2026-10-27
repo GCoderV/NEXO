@@ -130,11 +130,23 @@ NUEVO: AGENTE CON HERRAMIENTAS Y DOCUMENTO COMPLETO
 * "Antecedentes" se redacta dentro del Marco teorico y las Referencias se
   construyen solo con las fuentes registradas en el proyecto.
 
+CADA PROYECTO EMPIEZA EN BLANCO
+-------------------------------
+Al crear o abrir otro proyecto, Nexo NO conserva nada del anterior:
+se borran el recibo del ultimo agente, el apartado seleccionado, los
+limites del modo agente, los permisos de busqueda, los consentimientos,
+el texto pendiente y el contenido visible de las pestanas. El proyecto
+nuevo no "asume" la universidad, poblacion ni metodologia del anterior.
+Los proyectos YA GUARDADOS no se tocan: vuelve a abrir uno y todos sus
+hechos, borradores, fuentes y recibos siguen ahi. Si ves datos de otra
+tesis en un proyecto nuevo, ejecuta VERIFICAR.cmd: debe decir
+"Aislamiento de proyectos: OK".
+
 COMO SABER SI TIENES LA VERSION CORREGIDA
 -----------------------------------------
 Haz doble clic en VERIFICAR.cmd . En la pantalla debe aparecer:
 
-    Nexo Tesis 0.4.1-dev (fase6-3) - comprobacion local (sin red)
+    Nexo Tesis 0.4.1-dev (fase6-4) - comprobacion local (sin red)
     ...
     Borradores largos: OK (hasta 20000 caracteres).
     Busqueda y plan: OK (consultas largas + apartados pendientes).
@@ -142,10 +154,11 @@ Haz doble clic en VERIFICAR.cmd . En la pantalla debe aparecer:
     Fases 1-6: OK (estado, puertas, investigacion, bucle continuo sin cuota).
     Sesion Copilot: OK (no se cierra tras capturar; solo se limpian fallos).
     Datos empiricos: OK (pregunta al usuario; no rellena Conclusiones).
+    Aislamiento de proyectos: OK (un proyecto nuevo no hereda el anterior).
     Todo correcto.
 
-Si NO aparecen las SEIS lineas "OK" o no dice
-"(fase6-3)", estas abriendo una copia VIEJA de Nexo. Cierra la
+Si NO aparecen las SIETE lineas "OK" o no dice
+"(fase6-4)", estas abriendo una copia VIEJA de Nexo. Cierra la
 aplicacion, descarga el ZIP nuevo y descomprimelo en una carpeta VACIA.
 Tus proyectos NO estan dentro de esa carpeta: estan en
 %USERPROFILE%\.nexo-tesis y se conservan.

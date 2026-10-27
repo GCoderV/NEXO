@@ -1,6 +1,6 @@
 # Reconstrucción de Nexo Tesis · Fases 0–6
 
-**Build:** `0.4.1-dev (fase6-3)` · **Estado:** build de desarrollo, no release.
+**Build:** `0.4.1-dev (fase6-4)` · **Estado:** build de desarrollo, no release.
 **Alcance:** Nexo Tesis únicamente. Nexo PC 0.6.0 no se modifica.
 
 ---
@@ -230,7 +230,7 @@ frontera que faltaba en el anfitrión:
 reproducción exacta del JSON: el bucle se detiene con `stopped='pregunta'` tras
 **1** llamada al modelo (antes quemaba hasta 300), no guarda el borrador
 provisional, no duplica la pregunta, respeta el anteproyecto y no pregunta
-mientras queden apartados redactables. Suite completa: **485 pruebas OK /
+mientras queden apartados redactables. Suite completa: **492 pruebas OK /
 2 omitidas**. `VERIFICAR.cmd` incorpora `check_empirical_boundary()`.
 
 **Reparación colateral.** `tests/test_v040.py` buscaba el paquete 0.3.1 de
@@ -242,6 +242,58 @@ limpiamente si no existe.
 display ni una sesión M365. La detección de placeholders es léxica y
 determinista: puede tener falsos negativos ante una redacción ingeniosa, pero
 nunca inventa evidencia ni marca un apartado como terminado sin corpus.
+
+### Corrección posterior (build `fase6-4`): un proyecto nuevo asumía el anterior
+
+**Síntoma real.** «cuando creó un nuevo proyecto sigue asumiendo cosas del
+proyecto anterior».
+
+**Diagnóstico.** `ProjectStore.create()` **ya creaba** un proyecto vacío
+(`facts={}`, `drafts={}`, `sources=[]`, un único mensaje genérico). Se verificó
+con un turno real del `Agent` que el contexto enviado al modelo para el
+proyecto B no contenía ningún dato de A. El problema estaba en el estado **en
+memoria de `Application`**, que no se limpiaba al cambiar de proyecto:
+
+| Estado que se arrastraba | Efecto visible |
+| --- | --- |
+| `doc_status` («Último agente: 7 pasos…») | parecía que el proyecto nuevo ya tenía un historial del agente |
+| `draft_key` en `conclusiones` | la pestaña Apartados abría el proyecto nuevo en la fase final del anterior |
+| `include_optional`, `loop_passes`, `continuous_research`, `continuous_minutes`, `auto_limit` | el nuevo trabajo se ejecutaba con los límites y permisos del anterior |
+| `consent`, `pending_user_text`, `documents`, `word_origin`, `events` | autorizaciones, texto pendiente y eventos de la sesión anterior |
+| widgets `chat`/`memory_text`/`source_text`/`word_*` actualizados sólo de forma condicional | texto viejo en pestañas que no se repintaban |
+
+`refresh_document()` sólo escribía `doc_status` **si existía** `last_loop`, así
+que el recibo anterior permanecía para siempre en el proyecto nuevo. Además,
+`new_project()` creaba el proyecto y anunciaba «Proyecto nuevo» incluso cuando
+`open_project()` se negaba a abrirlo por haber un trabajo en curso (`busy`).
+
+**Corrección.** Un único punto, `Application.reset_project_scope()`, invocado
+por `open_project()` **antes** de cargar el proyecto y por `render()` cuando no
+hay proyecto abierto:
+
+- limpia los siete widgets de texto y las cinco etiquetas descriptivas;
+- devuelve los selectores y valores por defecto (`delimitacion`, 6 pasos,
+  60 min, investigación opcional activada, búsqueda desactivada);
+- vacía `consent`, `pending_user_text`, `documents`, `word_origin`,
+  `input_origin`, `draft_loaded` y la cola de eventos;
+- no toca ajustes de usuario (cuentas, rutas, tema, tamaño de ventana).
+
+`refresh_document()` borra `doc_status` cuando no hay `last_loop` (defensa en
+profundidad), y `new_project()` comprueba `busy` y sólo informa del éxito si el
+proyecto creado es efectivamente el abierto. **Los datos guardados no se
+modifican**: volver a abrir A restaura sus hechos, borradores, fuentes y recibo.
+
+**Pruebas.** 7 casos nuevos en `tests/test_aislamiento_proyectos_v043.py`, con
+la `Application` real sobre un doble de Tk en memoria (`tests/fake_tk_app.py`):
+el proyecto B no muestra ningún marcador de A, los valores por defecto se
+restauran, el estado de sesión queda vacío, volver a A no pierde nada, el
+modelo no recibe datos de A, `refresh_document()` limpia el recibo y no se crea
+un proyecto que no se puede abrir. `VERIFICAR.cmd` añade
+`check_project_isolation()`. Suite completa: **492 pruebas OK / 2 omitidas**.
+
+**Límite honesto.** El doble de Tk conserva texto y opciones, pero no es un
+servidor X ni un widget real: no se ha verificado el repintado visual en
+Windows. La lógica de aislamiento sí se ejecutó contra la `Application` real.
 
 ### Fase 1 — Núcleo de estado
 `project_state.py`: cinco módulos M1–M5, `commit_slice()` como única vía de
@@ -338,11 +390,13 @@ cuota) y un bucle continuo que **termina por verificación**.
 ## 4. Cómo probarlo en el equipo
 
 1. Descomprime el ZIP en una carpeta vacía y ejecuta `VERIFICAR.cmd`.
-   Debe decir `(fase6-3)` y seis líneas `OK`, incluidas
-   «Sesion Copilot: OK (no se cierra tras capturar; solo se limpian fallos)» y
-   «Datos empiricos: OK (pregunta al usuario; no rellena Conclusiones)».
-   Si faltan esas líneas, estás abriendo un ZIP viejo (`fase6-2` o anterior).
+   Debe decir `(fase6-4)` y siete líneas `OK`, incluidas
+   «Datos empiricos: OK (pregunta al usuario; no rellena Conclusiones)» y
+   «Aislamiento de proyectos: OK (un proyecto nuevo no hereda el anterior)».
+   Si faltan esas líneas, estás abriendo un ZIP viejo (`fase6-3` o anterior).
 2. Abre `INICIAR-TESIS.cmd`, usa un proyecto de prueba sin datos personales.
+   Crea un segundo proyecto: debe empezar en blanco, sin el recibo del agente
+   ni los límites del anterior. Al volver al primero, sus datos siguen ahí.
 3. Si aparece un error, pulsa **«Copiar diagnóstico»** y pega el JSON: contiene
    el traceback redactado, la versión de Python/Tk y la forma del estado, sin el
    contenido de la tesis.

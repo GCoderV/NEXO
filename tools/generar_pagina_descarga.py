@@ -40,7 +40,7 @@ BODY = """<body><main>
 <p class="meta">{size} bytes · {files} archivos · <span id="hash">verificando integridad…</span></p>
 <p class="meta">SHA-256 esperado: <code>{sha}</code></p>
 
-<div class="news"><strong>Novedad de esta copia ({build}):</strong> <strong>el agente continuo YA NO rellena Resultados, Discusión ni Conclusiones con texto provisional cuando faltan datos.</strong> Cuando no hay corpus confirmado y ya no queda otro capítulo por trabajar, se detiene y te hace <strong>una pregunta concreta</strong> para que aportes los datos del estudio; las puertas de calidad bloquean los placeholders del tipo «no existen evidencias empíricas…». Un anteproyecto sigue pudiendo terminar sin resultados. Esto es una frontera humana, <strong>no una cuota de pasos</strong>. También sigue corregido el cierre automático de Copilot tras capturar la sesión (<em>fase6-2</em>): la ventana queda abierta y <strong>debes dejarla abierta</strong> mientras uses la cuenta. Se mantienen el agente continuo sin cuota, la búsqueda de fuentes en Crossref y la pestaña <strong>Documento</strong> (Markdown, HTML y DOCX sin Word ni internet). <strong>Para confirmar que abres esta copia:</strong> ejecuta <code>VERIFICAR.cmd</code> y comprueba que dice <code>({build})</code> y las seis líneas <code>OK</code>, incluidas <em>«Sesion Copilot: OK»</em> y <em>«Datos empiricos: OK»</em>. Si no aparecen, estás usando una carpeta antigua.</div>
+<div class="news"><strong>Novedad de esta copia ({build}):</strong> <strong>un proyecto nuevo YA NO asume nada del proyecto anterior.</strong> Al crear o abrir otro proyecto se borran el recibo del agente, el apartado seleccionado, los límites del modo agente, los permisos de búsqueda, los consentimientos y el texto pendiente: cada proyecto empieza verdaderamente en blanco (los datos guardados del proyecto anterior se conservan al volver a abrirlo). Esto corrige el caso en que el bot parecía seguir trabajando con la universidad, población o método de la tesis previa. También siguen corregidos: el agente continuo <strong>no rellena Conclusiones sin datos</strong> (pregunta por el corpus; <em>fase6-3</em>) y Copilot <strong>no se cierra</strong> tras capturar la sesión (<em>fase6-2</em>) —déjalo abierto mientras uses la cuenta—. Se mantienen el agente continuo sin cuota de pasos, la búsqueda de fuentes en Crossref y la pestaña <strong>Documento</strong> (Markdown, HTML y DOCX sin Word ni internet). <strong>Para confirmar que abres esta copia:</strong> ejecuta <code>VERIFICAR.cmd</code> y comprueba que dice <code>({build})</code> y las siete líneas <code>OK</code>, incluidas <em>«Datos empiricos: OK»</em> y <em>«Aislamiento de proyectos: OK»</em>. Si no aparecen, estás usando una carpeta antigua.</div>
 
 <div class="box">
 <strong>Si el botón no descarga</strong> (algunos visores bloquean descargas):
@@ -109,7 +109,7 @@ def build():
             '<meta name="viewport" content="width=device-width,initial-scale=1">\n'
             '<title>Descarga directa · Nexo Tesis 0.4.1-dev</title>\n'
             '<style>' + CSS + '</style>\n</head>\n' +
-            BODY.format(build='fase6-3', b64=base64.b64encode(data).decode('ascii'),
+            BODY.format(build='fase6-4', b64=base64.b64encode(data).decode('ascii'),
                         size='{:,}'.format(len(data)).replace(',', '.'), files=files, sha=sha))
     OUT.parent.mkdir(parents=True, exist_ok=True)
     OUT.write_text(page, 'utf-8')
