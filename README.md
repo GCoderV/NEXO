@@ -21,10 +21,13 @@ Código y contexto para continuar el desarrollo en una sesión limpia.
 >
 > **Descarga (build de desarrollo, no release):**
 > [nexo-tesis-v0.4.1-dev-windows.zip](releases/nexo-tesis-v0.4.1-dev-windows.zip)
-> (587,402 bytes, 111 archivos). SHA-256: `c3a1220fb8ac5fad39202542f0574ccf5fd42b4b14d697a6851c172cf5beea90`.
-> Reconstruido para que **elegir Copilot365 no pida API key** y para que un JSON
-> válido envuelto en texto no provoque «La respuesta no cumple el formato
-> académico». Ver `LEER-PRIMERO.txt`.
+> (592,107 bytes, 112 archivos). SHA-256: `ab3127018a1394f6e5edb4ad40cb785e25ab2de6a678ca40056105605aa83c86`.
+> Incluye la corrección de Copilot365 sin API key, la tolerancia a JSON envuelto
+> y la **auditoría de robustez** (configuración concurrente, recuperación de
+> `config.json`, ids monótonos, compatibilidad de proyectos antiguos, versión
+> única y comprobación previa de la carpeta de datos).
+> Informe: [contexto/AUDITORIA-ROBUSTEZ.md](contexto/AUDITORIA-ROBUSTEZ.md).
+> 350 pruebas superadas / 2 omitidas. Ver `LEER-PRIMERO.txt`.
 > **Listo para usar:** descomprimir en una carpeta vacía y hacer doble clic en
 > `INICIAR-TESIS.cmd` (se autoverifica y abre la app). Requiere Python 3.11+ con
 > Tkinter; no instala nada. Incluye `LEER-PRIMERO.txt`, `VERIFICAR.cmd`, aviso de

@@ -7,6 +7,7 @@ import hashlib
 import importlib
 import sys
 from pathlib import Path
+from version import VERSION
 
 ROOT = Path(__file__).resolve().parent
 CORE = ('agent', 'autonomy', 'bibliography', 'config', 'context_policy',
@@ -16,9 +17,27 @@ CORE = ('agent', 'autonomy', 'bibliography', 'config', 'context_policy',
 UI = ('app', 'material_dialog', 'settings_dialog', 'word_layout_dialog')
 
 
+def check_data_dir():
+    """Preflight the user data folder WITHOUT reading keys or projects.
+
+    A read-only ~/.nexo-tesis makes every save fail at runtime with an opaque
+    error; detecting it here gives an actionable message before the app opens.
+    """
+    import os
+    path = Path.home() / '.nexo-tesis'
+    label = '~/.nexo-tesis'
+    if not path.exists():
+        print('Datos: ' + label + ' se creara al abrir Nexo (no se crea ahora).')
+        return []
+    if not os.access(path, os.W_OK):
+        return ['Sin permiso de escritura en ' + label + ': Nexo no podra guardar proyectos ni configuracion. Revisa los permisos de tu carpeta de usuario.']
+    print('Datos: carpeta accesible; no se leyeron claves ni proyectos.')
+    return []
+
+
 def main():
     problems = []
-    print('Nexo Tesis 0.4.1-dev - comprobacion local (sin red)')
+    print(f'Nexo Tesis {VERSION} - comprobacion local (sin red)')
     print('Python:', sys.version.split()[0])
     if sys.version_info < (3, 11):
         problems.append('Se requiere Python 3.11 o superior.')
@@ -65,6 +84,7 @@ def main():
     except Exception as e:
         problems.append('Falta SQLite: ' + str(e)[:100])
 
+    problems += check_data_dir()
     if problems:
         print('')
         print('PROBLEMAS ENCONTRADOS:')

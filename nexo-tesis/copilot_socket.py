@@ -62,6 +62,19 @@ def identity_fingerprint(secret):
         return hashlib.sha256(('m365|'+tid+'|'+oid).encode('utf-8')).hexdigest()
     except Exception:return ''
 
+def expires_soon(identity,margin=30):
+    """Some tenants issue exp as a string and some tokens omit it.
+
+    An unknown expiry must NOT be treated as expired: that produced a false
+    "Sesión de Copilot caducada" before any request reached Microsoft. A truly
+    expired session is still handled by the auth error from the handshake.
+    """
+    value=identity.get('exp') if isinstance(identity,dict) else None
+    if isinstance(value,bool):return False
+    try:expires=float(value)
+    except (TypeError,ValueError):return False
+    return expires<time.time()+margin
+
 def opening_headers(conversation):
     """Affinity header applied to the opening handshake only; value is the ConversationId.
 
@@ -263,12 +276,12 @@ def complete(secret,prompt,model,timeout,stop=None,remote=None,update_secret=Non
     from that slot; the header can be disabled for an isolated comparison.
     """
     data,identity=capture_info(secret);stop=stop or threading.Event();remote=remote if remote is not None else {};start=time.monotonic()
-    if identity.get('exp',0)<time.time()+30:
+    if expires_soon(identity,30):
         if not data.get('cdp_port'):raise ProviderError('Sesión de Copilot caducada: pulsa Conectar escritorio.',kind='auth',retryable=True)
         try:secret=capture_connection(data['cdp_port'],previous=data,stop=stop,timeout=min(30,timeout))
         except ProviderError:raise ProviderError('No se observó una renovación de Microsoft 365. Reconecta la cuenta desde Nexo y envía la frase en un chat nuevo; no se forzó ninguna recarga.',kind='auth',retryable=not stop.is_set()) from None
         data,identity=capture_info(secret)
-        if identity.get('exp',0)<time.time()+10:raise ProviderError('Microsoft todavía no renovó la sesión. Vuelve a conectar.',kind='auth',retryable=True)
+        if expires_soon(identity,10):raise ProviderError('Microsoft todavía no renovó la sesión. Vuelve a conectar.',kind='auth',retryable=True)
         if update_secret:update_secret(secret)
     if len(prompt)>60000:raise ProviderError('Contexto Copilot demasiado grande.')
     if model!='auto':raise ProviderError('Solo se admite la selección auto observada en tu sesión.')
@@ -279,7 +292,9 @@ def complete(secret,prompt,model,timeout,stop=None,remote=None,update_secret=Non
     headers=opening_headers(conversation) if use_affinity else []
     frame=copy.deepcopy(data['frame']);a=frame['arguments'][0]
     a.update(sessionId=session,clientCorrelationId=request,traceId=request,isStartOfSession=not remote.get('turns',0))
-    a.setdefault('clientInfo',{})['clientSessionId']=session
+    client_info=a.get('clientInfo')
+    if not isinstance(client_info,dict):client_info={};a['clientInfo']=client_info
+    client_info['clientSessionId']=session
     a['message'].update(text=prompt,author='user',requestId=request)
     if model!='auto':a['tone']=model
     from datetime import datetime,timezone
@@ -328,4 +343,6 @@ def complete(secret,prompt,model,timeout,stop=None,remote=None,update_secret=Non
         if sent and not confirmed:
             remote['uncertain']=True
             if details is not None:details['continuity']={'turns':remote.get('turns',0),'affinity_header':use_affinity,'confirmed':False}
-        if ws:ws.close()
+        if ws:
+            try:ws.close()
+            except Exception:pass

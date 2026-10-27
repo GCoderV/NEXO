@@ -89,6 +89,21 @@ def extract(path,native=None):
     status='texto_extraido' if segments and not omitted and read==units else 'extraccion_parcial' if segments else 'recibido_sin_texto'
     return {'status':status,'segments':segments,'units':units,'read_units':read,'omitted':omitted,'characters':total,'warnings':list(dict.fromkeys(warnings))}
 
+def _material_number(value):
+    m=re.fullmatch(r'D(\d{1,9})',str(value or ''))
+    return int(m.group(1)) if m else 0
+
+def _next_material_ref(p):
+    """Monotonic D# refs: reusing a retired ref would make old citations point
+    at a different file. Non-numeric legacy refs must not crash an import."""
+    items=p.get('materials',[])
+    highest=max([_material_number(m.get('ref','')) for m in items if isinstance(m,dict)]+[0])
+    stored=p.get('material_seq',0)
+    stored=stored if type(stored) is int and 0<=stored<=10**9 else 0
+    value=max(stored,highest)+1
+    p['material_seq']=value
+    return 'D'+str(value)
+
 def import_file(root,p,path,role,native=None):
     safe_id(p['id']);path=Path(path)
     if role not in ROLES or path.suffix.lower() not in FORMATS:raise ValueError('Tipo de material no admitido.')
@@ -121,7 +136,7 @@ def import_file(root,p,path,role,native=None):
             if r.stderr.strip():data['warnings'].append('El lector emitió advertencias técnicas; verifica legibilidad y cobertura del texto extraído.')
     except Exception as e:data={'status':'error_lectura','segments':[],'units':0,'read_units':0,'characters':0,'omitted':0,'warnings':['No se leyó el archivo: '+str(e)[:300]]}
     (folder/'extracted.json').write_text(json.dumps(data,ensure_ascii=False),encoding='utf-8')
-    record={'id':id,'ref':'D'+str(len(p.get('materials',[]))+1),'name':path.name[:180],'role':role,'sha256':digest,'suffix':path.suffix.lower(),'bytes':len(raw),'status':data['status'],'characters':data['characters'],'units':data['units'],'read_units':data['read_units'],'warnings':data['warnings'],'shared_routes':[],'active':True,'created':now(),'version':1+sum(m['name']==path.name[:180] for m in p.get('materials',[]))}
+    record={'id':id,'ref':_next_material_ref(p),'name':path.name[:180],'role':role,'sha256':digest,'suffix':path.suffix.lower(),'bytes':len(raw),'status':data['status'],'characters':data['characters'],'units':data['units'],'read_units':data['read_units'],'warnings':data['warnings'],'shared_routes':[],'active':True,'created':now(),'version':1+sum(m['name']==path.name[:180] for m in p.get('materials',[]))}
     return record,data
 
 def attach(p,record):
@@ -155,13 +170,16 @@ def select(root,p,query,route_scopes,budget=6000):
     for m in p.get('materials',[]):
         if not m.get('active') or not route_scopes or not set(route_scopes)<=set(m.get('shared_routes',[])):continue
         try:data=content(root,p,m)
-        except (OSError,ValueError):continue
-        for i,seg in enumerate(data['segments']):
-            score=(100 if m['ref'] in explicit else 0)+len(words & set(re.findall(r'\w{4,}',seg['text'].lower())))+(3 if m['role']=='guia' else 0)
+        except (OSError,ValueError,UnicodeError,KeyError,TypeError):continue
+        segments=data.get('segments') if isinstance(data,dict) else None
+        if not isinstance(segments,list):continue  # damaged extracted.json must not abort a turn
+        for i,seg in enumerate(segments):
+            if not isinstance(seg,dict) or not isinstance(seg.get('text'),str) or not isinstance(seg.get('locator'),str):continue
+            score=(100 if m.get('ref') in explicit else 0)+len(words & set(re.findall(r'\w{4,}',seg['text'].lower())))+(3 if m.get('role')=='guia' else 0)
             ranked.append((score,-i,m,seg))
     ranked.sort(key=lambda x:(x[0],x[1]),reverse=True);out=[]
     for _,_,m,seg in ranked:
         if len(out)>=6:break
         if len(seg['text'])>budget:continue
-        out.append({'id':m['ref'],'name':m['name'],'role':m['role'],'version':m['version'],'locator':seg['locator'],'text':seg['text'],'scope':'extracto local; original no subido a Copilot'});budget-=len(seg['text'])
+        out.append({'id':m.get('ref',''),'name':m.get('name',''),'role':m.get('role',''),'version':m.get('version',1),'locator':seg['locator'],'text':seg['text'],'scope':'extracto local; original no subido a Copilot'});budget-=len(seg['text'])
     return out

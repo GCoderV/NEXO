@@ -66,10 +66,18 @@ class AccountTests(unittest.TestCase):
         self.assertEqual([x['provider'] for x in self.c.candidates()],['Ollama']);self.assertFalse(self.c.data['routes'][-1]['auto'])
     def test_ollama_never_auto_from_remote(self):
         _,r=self.add();self.c.select(r);self.c.route('Ollama','local',auto=True);self.assertEqual([x['provider'] for x in self.c.candidates()],['Groq'])
-    def test_corrupt_config_not_overwritten(self):
-        self.c.path.write_text('{"schema":2,"current":{},"profiles":{},"accounts":[],"routes":[]}')
-        loaded=Config(self.temp.name,FakeProtector());self.assertTrue(loaded.warning);self.assertEqual(loaded.data['accounts'],{})
-        with self.assertRaises(ValueError):loaded.flush()
+    def test_corrupt_config_quarantined_and_recoverable(self):
+        # The damaged bytes are preserved once, but the app must NOT be locked out
+        # of every future save: the user can reconfigure from the UI and continue.
+        bad='{"schema":2,"current":{},"profiles":{},"accounts":[],"routes":[]}'
+        self.c.path.write_text(bad)
+        loaded=Config(self.temp.name,FakeProtector())
+        self.assertTrue(loaded.warning);self.assertEqual(loaded.data['accounts'],{})
+        backups=list(Path(self.temp.name).glob('config-invalido-*.json'))
+        self.assertEqual(len(backups),1);self.assertEqual(backups[0].read_text('utf-8'),bad)
+        loaded.account('Groq','Nueva','CLAVE-SINTETICA');loaded.flush()
+        self.assertEqual(backups[0].read_text('utf-8'),bad)
+        self.assertEqual(len(Config(self.temp.name,FakeProtector()).data['accounts']),1)
     def test_legacy_migration_merges_provider_secrets_and_preserves_backup(self):
         profiles={}
         for m in ('a','b'):

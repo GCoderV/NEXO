@@ -131,9 +131,15 @@ class API:
             if not isinstance(raw,dict):raise RuntimeError('Ollama no devolvió un mensaje utilizable.')
             message={k:v for k,v in raw.items() if k in ('role','content','tool_calls','thinking')}
             message['role']='assistant';text=message.get('content') or '';calls=[]
-            for c in message.get('tool_calls',[]):
-                f=c['function'];args=f.get('arguments',{})
-                if isinstance(args,str):args=json.loads(args)
+            for c in message.get('tool_calls',[]) or []:
+                if not isinstance(c,dict):continue
+                f=c.get('function')
+                if not isinstance(f,dict) or not isinstance(f.get('name'),str):continue
+                args=f.get('arguments',{})
+                if isinstance(args,str):
+                    try:args=json.loads(args)
+                    except (ValueError,TypeError):args={}
+                if not isinstance(args,dict):args={}
                 calls.append({'id':uuid.uuid4().hex,'name':f['name'],'args':args})
             return message,text,calls
         if self.provider=='Gemini':

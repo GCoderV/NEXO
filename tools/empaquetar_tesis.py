@@ -41,7 +41,12 @@ Las librerías `websocket` y `pypdf` ya vienen incluidas: no hay que instalar na
   un bloque ```json. Se valida un único objeto completo, sin llamada de
   reparación; el aviso indica ahora el motivo exacto sin mostrar la respuesta.
   Las instrucciones de tarea y de hilo incremental comparten el mismo contrato.
-- Pruebas locales: 331 superadas / 2 omitidas con fixtures sintéticas.
+- Auditoría de robustez: configuración concurrente con bloqueo e instantánea,
+  recuperación ante `config.json` dañado, ids `F#`/`D#` monótonos, tolerancia a
+  extracciones y proyectos antiguos, expiración de Copilot robusta, bookkeeping
+  de rutas que no pierde respuestas, versión única y comprobación previa de la
+  carpeta de datos. Detalle: `contexto/AUDITORIA-ROBUSTEZ.md` en el repo.
+- Pruebas locales: 350 superadas / 2 omitidas con fixtures sintéticas.
 - **NO verificado**: sesión real de Copilot, recuerdo del servidor, Word COM,
   DPAPI, PowerShell de Windows ni la interfaz Tk en este entorno.
 - La cabecera `X-RoutingParameter-SessionKey` es evidencia de terceros sin
@@ -63,7 +68,7 @@ FORBIDDEN_PREFIXES = ('tests/', 'reports/', '__pycache__/', 'copilot-login/', 'm
 FORBIDDEN_NAMES = ('.gitignore', '.env', 'config.json', 'preferences.json',
                    'projects.sqlite3', 'SHA256SUMS.txt')
 # Conveniencias de "listo para usar" añadidas en 0.4.1-dev.
-READY_EXTRAS = ('LEER-PRIMERO.txt', 'VERIFICAR.cmd', 'verificar_instalacion.py')
+READY_EXTRAS = ('LEER-PRIMERO.txt', 'VERIFICAR.cmd', 'verificar_instalacion.py', 'version.py')
 
 
 def runtime_paths():

@@ -65,7 +65,7 @@ def parse_json(text):
         value=json.loads(text.strip())
         if isinstance(value,dict):return value
     except (ValueError,TypeError):pass
-    for candidate in _json_objects(text):
+    for candidate in _json_objects(text)[:128]:  # bounded work on a 45k-char reply
         for attempt in (candidate,_without_trailing_commas(candidate)):
             try:value=json.loads(attempt)
             except (ValueError,TypeError):continue

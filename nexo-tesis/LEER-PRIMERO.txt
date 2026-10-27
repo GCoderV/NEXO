@@ -70,5 +70,16 @@ Para continuar SIN reiniciar el conjunto:
    volver a "Conservar el hilo y reenviar contexto completo": el
    recordatorio corto a veces hace que el modelo olvide el formato.
 
+COMPROBACIONES ANTES DE ABRIR
+-----------------------------
+INICIAR-TESIS.cmd revisa el paquete, Python 3.11+, Tkinter, SQLite y que tu
+carpeta de datos sea escribible. NO lee tus claves ni tus proyectos. Si dice
+que falta permiso de escritura, revisa los permisos de tu carpeta de usuario
+antes de seguir; de lo contrario Nexo no podra guardar nada.
+
+Si config.json se dana, Nexo conserva UNA copia "config-invalido-<fecha>.json"
+y empieza vacio: vuelve a crear tus cuentas en Modelos y cuentas. Ya no queda
+bloqueado para siempre. No borres la carpeta .nexo-tesis sin respaldarla.
+
 Archivos: README.md (manual completo), CONTINUIDAD-COPILOT.md (cambios y prueba),
 VERSION.json, SHA256SUMS.txt (integridad) y LICENSE + licencias de pypdf/websocket.

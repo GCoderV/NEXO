@@ -3,12 +3,33 @@ import copy
 import hashlib
 import json
 import os
+from contextlib import nullcontext
+from datetime import datetime, timezone
 from pathlib import Path
 import tempfile
+import threading
 import time
 import uuid
 from secrets_store import WindowsProtector
 DEFAULT={'provider':'Groq','model':'openai/gpt-oss-120b','endpoint':'http://127.0.0.1:11434','timeout':90}
+
+def edit(config):
+    """Serialize a direct mutation of config.data with Config.flush().
+
+    Worker threads (model failover) and the Tk thread (settings dialog) both
+    touch the same dict. Returns a no-op context manager for test doubles.
+    """
+    guard=getattr(config,'guard',None)
+    return guard() if callable(guard) else nullcontext()
+
+def locked(fn):
+    """Public Config operations share one reentrant lock (RLock allows nesting)."""
+    from functools import wraps
+    @wraps(fn)
+    def inner(self,*args,**kwargs):
+        with self.lock:return fn(self,*args,**kwargs)
+    return inner
+
 def atomic(path,data):
     path=Path(path);path.parent.mkdir(parents=True,exist_ok=True);fd,name=tempfile.mkstemp(dir=path.parent,prefix='.tesis-')
     try:
@@ -19,13 +40,14 @@ def atomic(path,data):
 class Config:
     def __init__(self,root,protector=None):
         self.path=Path(root)/'config.json';self.protector=protector or WindowsProtector();self.memory={};self.warning='';self.needs_backup=False
+        self.lock=threading.RLock();self.block_save=False
         self.data={'schema':2,'current':dict(DEFAULT),'profiles':{},'accounts':{},'routes':[], 'automatic':True,'attempt_limit':6,'cycle_seconds':180,'health':{},'cooldowns':{}}
         defaults=copy.deepcopy(self.data)
         if self.path.exists():
             try:
                 if self.path.stat().st_size>2_000_000:raise ValueError('Configuración demasiado grande.')
                 d=json.loads(self.path.read_text('utf-8'))
-                if not isinstance(d.get('current'),dict) or not isinstance(d.get('profiles'),dict):raise ValueError('Formato incorrecto.')
+                if not isinstance(d,dict) or not isinstance(d.get('current'),dict) or not isinstance(d.get('profiles'),dict):raise ValueError('Formato incorrecto.')
                 if d.get('schema',1)>2:raise ValueError('Configuración de una versión posterior.')
                 if d.get('schema',1)==2:
                     if not isinstance(d.get('accounts'),dict) or not isinstance(d.get('routes'),list):raise ValueError('Cuentas o rutas inválidas.')
@@ -35,15 +57,48 @@ class Config:
                         if not isinstance(r,dict) or not all(isinstance(r.get(k),str) for k in ('id','provider','model','account_id','endpoint')):raise ValueError('Ruta inválida.')
                     if not isinstance(d.get('health',{}),dict) or not isinstance(d.get('cooldowns',{}),dict):raise ValueError('Estado de rutas inválido.')
                 self.data.update(d)
+                self._normalize()
                 if d.get('schema',1)==1:self._migrate()
-            except Exception as e:self.data=defaults;self.warning='No se pudo cargar la configuración; no se ha sobrescrito: '+type(e).__name__;self.block_save=True
-    def flush(self):
-        if getattr(self,'block_save',False):raise ValueError(self.warning)
-        if self.needs_backup and self.path.exists():
-            backup=self.path.with_name('config-v01-respaldo.json')
+            except Exception as e:
+                self.data=defaults
+                # Preserve the damaged bytes once, then allow the user to reconfigure
+                # from the UI. The old behaviour blocked EVERY save forever, which
+                # left the app unusable until config.json was deleted by hand.
+                backup=self._quarantine()
+                self.warning=('No se pudo cargar la configuración ('+type(e).__name__+'). '
+                              +(f'Se conservó una copia en {backup.name}. ' if backup else '')
+                              +'Se empezó con una configuración vacía: puedes volver a crear tus cuentas y rutas. No se sobrescribió la copia.')
+    def _quarantine(self):
+        try:
+            stamp=datetime.now(timezone.utc).strftime('%Y%m%d-%H%M%S')
+            backup=self.path.with_name('config-invalido-'+stamp+'.json')
             if not backup.exists():backup.write_bytes(self.path.read_bytes())
-            self.needs_backup=False
-        atomic(self.path,self.data)
+            return backup
+        except Exception:return None
+    def _normalize(self):
+        """Older or hand-edited files must not crash migration or later writes."""
+        d=self.data
+        if not isinstance(d.get('accounts'),dict):d['accounts']={}
+        if not isinstance(d.get('routes'),list):d['routes']=[]
+        if not isinstance(d.get('profiles'),dict):d['profiles']={}
+        if not isinstance(d.get('health'),dict):d['health']={}
+        if not isinstance(d.get('cooldowns'),dict):d['cooldowns']={}
+        if not isinstance(d.get('current'),dict):d['current']=dict(DEFAULT)
+        for k,v in DEFAULT.items():d['current'].setdefault(k,v)
+    def guard(self):
+        """Context manager for external direct edits to config.data."""
+        return self.lock
+    def flush(self):
+        if self.block_save:raise ValueError(self.warning)
+        with self.lock:
+            if self.needs_backup and self.path.exists():
+                backup=self.path.with_name('config-v01-respaldo.json')
+                if not backup.exists():backup.write_bytes(self.path.read_bytes())
+                self.needs_backup=False
+            snapshot=copy.deepcopy(self.data)
+        # Serialize a stable snapshot: json.dump iterating a dict mutated by the
+        # Tk thread while a worker flushes raises "dictionary changed size...".
+        atomic(self.path,snapshot)
     @staticmethod
     def key_id(provider,model,endpoint):
         if provider=='Gemini':model=model.removeprefix('models/')
@@ -68,10 +123,12 @@ class Config:
             c=d['current']
             if pid==self.key_id(c['provider'],c['model'],c.get('endpoint','')):c['route_id']=rid
         self.warning=(self.warning+' Configuración migrada: revisa las cuentas y marca las rutas que desees incluir en rotación.').strip()
+    @locked
     def secret(self,aid):
         if aid in self.memory:return self.memory[aid]
         a=self.data['accounts'].get(aid,{})
         return self.protector.open(a['secret']) if a.get('secret') else ''
+    @locked
     def account(self,provider,alias,key,remember=False,aid=None,enabled=True):
         from providers import PROVIDERS
         if provider not in PROVIDERS or provider=='Ollama':raise ValueError('Proveedor de cuenta inválido.')
@@ -93,11 +150,13 @@ class Config:
             if identity:rec['identity']=identity
         if remember:rec['secret']=self.protector.seal(key.strip())
         self.data['accounts'][aid]=rec;self.memory[aid]=key.strip();self.data['health'].pop(aid,None);self.flush();return aid
+    @locked
     def remove_account(self,aid):
         self.data['accounts'].pop(aid,None);self.memory.pop(aid,None);self.data['health'].pop(aid,None)
         for r in self.data['routes']:
             if r['account_id']==aid:r['account_id']='';r['auto']=False
         self.flush()
+    @locked
     def route(self,provider,model,aid='',endpoint='http://127.0.0.1:11434',auto=False,rid=None):
         from providers import API
         if provider!='Ollama':
@@ -114,6 +173,7 @@ class Config:
         else:self.data['routes'].append(rec)
         self.data['profiles'][self.key_id(provider,api.model,endpoint)]={**rec}
         self.flush();return rec['id']
+    @locked
     def ensure_account_route(self,aid):
         """Expose an orphan account without changing selection or enabling rotation."""
         from providers import PROVIDERS
@@ -127,16 +187,19 @@ class Config:
         except Exception:return None
         # Suggested, not verified: no network and no automatic selection.
         return self.route(a['provider'],PROVIDERS[a['provider']],aid,auto=False)
+    @locked
     def select(self,rid):
         r=next((r for r in self.data['routes'] if r['id']==rid),None)
         if not r:raise ValueError('Ruta no encontrada.')
         self.data['current']={k:r.get(k,'') for k in ('provider','model','endpoint')};self.data['current'].update(route_id=rid,timeout=90);self.flush()
+    @locked
     def key(self,provider,model,endpoint):
         record=self.data['profiles'].get(self.key_id(provider,model,endpoint),{})
         if record.get('account_id'):return self.secret(record['account_id'])
         for a in self.data['accounts'].values():
             if a['provider']==provider and a['enabled']:return self.secret(a['id'])
         return ''
+    @locked
     def save(self,provider,model,endpoint,key,remember=False,timeout=90):
         # Compatibility entry point; same secret -> same provider account.
         aid=''
@@ -147,6 +210,7 @@ class Config:
                 if equal:aid=a['id'];break
             aid=self.account(provider,'Cuenta '+str(len(self.data['accounts'])+1),key,remember,aid or None)
         rid=self.route(provider,model,aid,endpoint);self.select(rid);self.data['current']['timeout']=timeout;self.flush()
+    @locked
     def route_key(self,r):
         if r['provider']=='Ollama':return ''
         a=self.data['accounts'].get(r.get('account_id'),{})
@@ -159,6 +223,7 @@ class Config:
                 capture_info(key)
             return key
         except Exception:return None
+    @locked
     def candidates(self):
         current=self.data['current'];rid=current.get('route_id')
         first=next((r for r in self.data['routes'] if r['id']==rid),None)
@@ -178,6 +243,7 @@ class Config:
     def api(self):
         from routing import RoutedAPI
         return RoutedAPI(self,self.candidates())
+    @locked
     def redact(self,text):
         text=str(text)
         for aid in self.data['accounts']:

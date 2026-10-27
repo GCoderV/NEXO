@@ -1,4 +1,4 @@
-# Nexo Tesis 0.4.0
+# Nexo Tesis 0.4.1-dev (desarrollo sobre 0.4.0)
 
 Agente académico independiente de Nexo PC. Empieza con un **tema**, conserva cada proyecto por separado y desarrolla propuestas revisables. No instala un complemento en Word ni incluye un tema de investigación obligatorio.
 
@@ -214,7 +214,9 @@ En `%USERPROFILE%\.nexo-tesis\`:
 - `word-audit\`: intención/resultado y huellas de operaciones, sin texto del documento ni credenciales.
 - `copilot-login\`: perfil de Edge separado, solo si utilizaste ese método.
 
-Los proyectos y las exportaciones son **texto legible, no cifrado**. Respáldalos con Nexo cerrado. DPAPI no hace portable una clave a cualquier equipo o usuario. Si una configuración está dañada no se sobrescribe silenciosamente: conserva una copia antes de repararla o renombrarla. No borres el directorio de datos de Nexo PC.
+Los proyectos y las exportaciones son **texto legible, no cifrado**. Respáldalos con Nexo cerrado. DPAPI no hace portable una clave a cualquier equipo o usuario. Si `config.json` está dañado, Nexo guarda **una sola** copia `config-invalido-<fecha>.json` y arranca con una configuración vacía que puedes volver a rellenar desde **Modelos y cuentas**; ya no bloquea todos los guardados. No borres el directorio de datos de Nexo PC.
+
+**Robustez (auditoría 0.4.1-dev):** la configuración se escribe con bloqueo y una instantánea, de modo que el hilo de red y la interfaz no se pisen. Los identificadores `F#` y `D#` son monótonos: borrar una fuente o un archivo no reasigna su número a otro contenido y las citas existentes no cambian de destino. Un `extracted.json` dañado se omite en lugar de abortar el turno. El lanzador comprueba además, sin leer claves, que la carpeta de datos sea escribible. El detalle completo está en `contexto/AUDITORIA-ROBUSTEZ.md` (en el repositorio de desarrollo).
 
 Validación de 0.4.0 en el entorno del asistente: **276 pruebas unitarias, 274 aprobadas y 2 omitidas por requerir Windows; 98 comprobaciones funcionales Tk y 2 capturas opcionales**. Se ejecutaron los contratos de inserción/estructura/índice de PowerShell anteriores y seis nuevas comprobaciones del perfil, sus límites y el cargador. La lógica nativa de fuente, tamaños, interlineado y papel A4/márgenes se probó con **dobles**, no con Word COM. También se comprobaron Python 3.11.17 con `-S`, importaciones sin dependencias instaladas, el paquete extraído, integridad ZIP y hashes.
 

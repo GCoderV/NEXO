@@ -54,6 +54,15 @@ def validate(p):
         if not isinstance(p.get(k),dict):raise ValueError('Proyecto inválido: '+k)
     for k in ('messages','questions','sources','decisions'):
         if not isinstance(p.get(k),list):raise ValueError('Proyecto inválido: '+k)
+    # Fields added in later builds are read with p['...'] in app/agent. A project
+    # written by an older version must not crash on load with a bare KeyError.
+    if not isinstance(p.get('run'),dict):p['run']={'status':'listo'}
+    if not isinstance(p.get('usage'),dict):p['usage']={}
+    for k in ('calls','input_tokens','output_tokens'):
+        if type(p['usage'].get(k)) is not int:p['usage'][k]=0
+    p.setdefault('data_ready',False);p.setdefault('profile',None);p.setdefault('word_path',None)
+    p.setdefault('created',now());p.setdefault('updated',now())
+    if not isinstance(p.get('materials'),list):p['materials']=[]
     if len(json.dumps(p,ensure_ascii=False).encode())>MAX_PROJECT:raise ValueError('Proyecto supera 3 MB; exporta una copia y archiva material antes de continuar. No se truncó.')
     return p
 

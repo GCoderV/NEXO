@@ -3,6 +3,7 @@ import json,queue,threading,uuid
 import tkinter as tk
 from tkinter import ttk,messagebox
 from providers import PROVIDERS,list_models
+from config import edit
 class SettingsDialog:
     def __init__(self,app):
         self.app=app;self.config=app.config;self.working=False;self.cancel=threading.Event();self.widgets=[];self.progress=queue.Queue();self.async_timer=None
@@ -171,11 +172,16 @@ class SettingsDialog:
     def remove_route(self):
         r=self.selected_route()
         if not messagebox.askyesno('Quitar ruta','¿Quitar esta ruta? La cuenta y la conversación se conservan.',parent=self.win):return
-        self.config.data['routes'].remove(r);self.config.flush();self.refresh()
+        with edit(self.config):self.config.data['routes'].remove(r);self.config.flush()
+        self.refresh()
     def toggle_route(self):
-        r=self.selected_route();r['enabled']=not r.get('enabled',True);self.config.flush();self.refresh()
+        r=self.selected_route()
+        with edit(self.config):r['enabled']=not r.get('enabled',True);self.config.flush()
+        self.refresh()
     def move(self,delta):
-        r=self.selected_route();items=self.config.data['routes'];i=items.index(r);j=max(0,min(len(items)-1,i+delta));items.insert(j,items.pop(i));self.config.flush();self.refresh()
+        r=self.selected_route();items=self.config.data['routes'];i=items.index(r);j=max(0,min(len(items)-1,i+delta))
+        with edit(self.config):items.insert(j,items.pop(i));self.config.flush()
+        self.refresh()
     def load_account(self):
         if self.working:return
         sel=self.account_tree.selection()
@@ -205,7 +211,8 @@ class SettingsDialog:
     def save_policy(self):
         n=self.limit.get();t=self.seconds.get()
         if not 1<=n<=30 or not 10<=t<=600:raise ValueError('Revisa los límites indicados.')
-        self.config.data.update(automatic=self.automatic.get(),attempt_limit=n,cycle_seconds=t);self.config.flush();self.note.set('Política guardada; solo se usan rutas configuradas y autorizadas.')
+        with edit(self.config):self.config.data.update(automatic=self.automatic.get(),attempt_limit=n,cycle_seconds=t);self.config.flush()
+        self.note.set('Política guardada; solo se usan rutas configuradas y autorizadas.')
     def async_job(self,fn,done):
         self.working=True;self.cancel.clear();self.cancel_button.state(['!disabled'])
         for w in self.widgets:w.state(['disabled'])
@@ -235,7 +242,7 @@ class SettingsDialog:
         self.note.set('Consultando modelos disponibles; no se está generando texto…')
         def done(models):
             self.model_combo.configure(values=[m['id'] for m in models]);self.note.set(f'{len(models)} modelos publicados por {provider}. Selecciona uno o escribe su ID y guarda la ruta. Publicación no garantiza acceso ni gratuidad.')
-            self.config.data.setdefault('catalog',{})[provider]=models;self.config.flush()
+            with edit(self.config):self.config.data.setdefault('catalog',{})[provider]=models;self.config.flush()
         self.async_job(lambda:list_models(provider,key,ep),done)
     def copy_probe(self):
         if not hasattr(self,'probe_text'):self.note.set('Inicia Conectar escritorio M365 para crear una frase de prueba.');return

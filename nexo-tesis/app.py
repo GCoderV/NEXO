@@ -9,13 +9,14 @@ import tkinter as tk
 from tkinter import ttk, messagebox, filedialog, simpledialog
 from tkinter.scrolledtext import ScrolledText
 from project_store import ProjectStore, FACT_KEYS, SECTIONS, LABELS, message, set_fact, invalidate, export_markdown, now
+from version import VERSION
 from config import Config
 from providers import PROVIDERS
 from agent import Agent
 from bibliography import add_fragment
 from word_bridge import WordBridge
 
-APP_VERSION='0.4.0'
+APP_VERSION=VERSION
 BG='#f2f5f5';INK='#183537';TEAL='#167d80';MUTED='#63777a';PAPER='#ffffff'
 
 class Application:
