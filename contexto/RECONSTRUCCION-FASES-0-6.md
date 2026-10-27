@@ -1,6 +1,6 @@
 # Reconstrucción de Nexo Tesis · Fases 0–6
 
-**Build:** `0.4.1-dev (fase6-1)` · **Estado:** build de desarrollo, no release.
+**Build:** `0.4.1-dev (fase6-2)` · **Estado:** build de desarrollo, no release.
 **Alcance:** Nexo Tesis únicamente. Nexo PC 0.6.0 no se modifica.
 
 ---
@@ -57,9 +57,11 @@ decía el registro— el proceso navegador queda huérfano y vacío.
 lanzamiento/captura se dejaron **byte-idénticas a 0.3.1** (la prueba de
 `test_v040` que las comparaba se sustituyó por invariantes semánticos), y la
 limpieza se implementó **fuera** de ellas, en `process_guard.py`, que envuelve
-`Popen` durante el intento de conexión y termina en un `finally` sólo los
-procesos que Nexo inició en esa sesión. La ventana real debe confirmarse en el
-equipo del usuario.
+`Popen` durante el intento de conexión. **Política corregida en `fase6-2`:**
+sólo termina los procesos que Nexo inició cuando el intento **falla o se
+cancela**; cuando la captura tiene éxito los **desvincula sin cerrarlos**, porque
+la sesión observada vive dentro de ese proceso de Copilot/Edge. La ventana real
+debe confirmarse en el equipo del usuario.
 
 ---
 
@@ -116,13 +118,65 @@ LangGraph ni MCP. Nexo es local, monousuario, Windows y sin servidor.
   log JSON redactado (sin texto de tesis, claves ni tokens) en
   `~/.nexo-tesis/logs/`; `wrap_excepthook`, `tk_callback`, `friendly()`,
   `recent()`. La UI ya no muestra el mensaje crudo del intérprete.
-- `process_guard.py`: registro de hijos y cierre en `finally`.
+- `process_guard.py`: registro de hijos; `close_all()` **sólo** en fallo o
+  cancelación y `detach_all()` en éxito (política unificada en
+  `guarded_capture()`, nunca en un `finally` del diálogo).
 - `Agent.turn` envuelve toda la preparación (incluido `pending()`) con logging y
   re-lanza; `app.py` cables de `guard`/`run_job`/`poll`/`error_callback` y botón
   «Copiar diagnóstico».
 - `conversation_state`, `autonomy.route_scope`, `guide_rules.approve`,
   `config.secret/candidates/redact`, `copilot_socket` (CDP `requestId`)
   normalizan tipos.
+
+### Corrección posterior (build `fase6-2`): «luego de capturar la sesión el bot cierra Copilot»
+
+**Síntoma real del usuario.** Después de guardar la conexión de Copilot365, el
+bot cerraba automáticamente Copilot/Edge; el turno siguiente fallaba con
+«Fallo de conexión Copilot».
+
+**Causa raíz (regresión introducida por la propia Fase 0).** La limpieza de la
+ventana huérfana se cableó así:
+
+1. `SettingsDialog.connect_copilot()` envolvía `capture_connection(...)` en un
+   `try/finally` con `process_guard.close_all()`. Un `finally` se ejecuta
+   **también en éxito**, así que mataba el proceso justo después de guardar el
+   secreto de sesión.
+2. `SettingsDialog.close()` llamaba a `process_guard.close_all()` otra vez, es
+   decir, cerrar la ventana de configuración también mataba Copilot.
+3. `copilot_socket.py` tenía además `_LAUNCHED` / `close_launched()` como código
+   muerto con la misma política de «cerrar en un finally».
+
+La sesión capturada **no es un token independiente**: Nexo vuelve a conectarse
+en cada turno al puerto de diagnóstico local (`127.0.0.1`) de ese proceso.
+Cerrarlo invalida la conexión recién guardada.
+
+**Corrección.** La política pasó a un único punto, `process_guard`:
+
+| Situación | Acción |
+| --- | --- |
+| Captura correcta | `detach_all()`: deja de seguir los hijos, **no termina nada** |
+| Fallo o cancelación | `close_all()`: termina sólo los procesos que Nexo inició en esa sesión |
+| Cerrar el diálogo | `stop_tracking()` como máximo; **nunca** `close_all()` |
+
+`guarded_capture(launch, capture)` implementa esa tabla y el diálogo sólo
+proporciona `launch()` y `capture(port)`. Se eliminó el código muerto de
+`copilot_socket.py`, se actualizaron los avisos de la UI («Nexo NO cerrará
+Copilot: déjalo abierto…») y `VERIFICAR.cmd` incorporó
+`check_copilot_stays_open()`, que demuestra la política con dobles sintéticos
+de `Popen`.
+
+**Pruebas nuevas** (sin Windows ni sesión real): 5 casos en
+`tests/test_fase0_v042.py` (desvinculación, éxito, fallo, fuente del diálogo) y
+6 de extremo a extremo en `tests/test_copilot_no_cierre_v042.py`, que ejecutan
+`SettingsDialog.connect_copilot()` real con Tk en memoria y un `Popen` falso:
+captura exitosa → proceso vivo; cerrar el diálogo → sigue vivo; cuenta guardada
+utilizable; fallo → huérfanos limpiados; cancelar antes de autorizar → no se
+lanza nada. Suite completa: **476 pruebas OK / 2 omitidas**.
+
+**Límite honesto.** No hay Windows, Edge, M365 Copilot ni Tk con display en el
+sandbox. La corrección se verificó con dobles, no con un proceso real. En el
+equipo del usuario, la comprobación es: capturar la sesión, cerrar el diálogo,
+enviar una solicitud y confirmar que la ventana de Copilot sigue abierta.
 
 ### Fase 1 — Núcleo de estado
 `project_state.py`: cinco módulos M1–M5, `commit_slice()` como única vía de
@@ -219,7 +273,9 @@ cuota) y un bucle continuo que **termina por verificación**.
 ## 4. Cómo probarlo en el equipo
 
 1. Descomprime el ZIP en una carpeta vacía y ejecuta `VERIFICAR.cmd`.
-   Debe decir `(fase6-1)` y cinco líneas `OK`.
+   Debe decir `(fase6-2)` y cinco líneas `OK`, incluida
+   «Sesion Copilot: OK (no se cierra tras capturar; solo se limpian fallos)».
+   Si falta esa línea, estás abriendo el ZIP viejo (`fase6-1`).
 2. Abre `INICIAR-TESIS.cmd`, usa un proyecto de prueba sin datos personales.
 3. Si aparece un error, pulsa **«Copiar diagnóstico»** y pega el JSON: contiene
    el traceback redactado, la versión de Python/Tk y la forma del estado, sin el

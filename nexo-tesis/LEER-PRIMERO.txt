@@ -45,6 +45,13 @@ ninguna clave: Copilot365 se conecta a TU sesion de Microsoft 365. Pasos:
 4. Cuando se guarde la conexion, vuelve a "Modelos y rutas" y pulsa
    "Guardar y usar".
 
+IMPORTANTE: Nexo NO cierra Copilot despues de capturar la sesion.
+DEJALO ABIERTO mientras uses esta cuenta: la conversacion necesita la
+ventana y su puerto de diagnostico local. Si lo cierras tu, la siguiente
+peticion fallara y tendras que volver a "Conectar escritorio M365".
+Nexo solo cierra las ventanas huerfanas de un intento FALLIDO o
+cancelado; el propio aviso de conexion lo explica.
+
 No pegues contrasenas, tokens ni URLs autenticadas. Si no tienes la app de
 escritorio de Copilot, prueba el modo "Acceso con Edge" en esa pestana.
 Es experimental: requiere acceso real a Microsoft 365 Copilot. Si no quieres
@@ -74,7 +81,8 @@ algo falla, Nexo guarda un diagnostico REDACTADO en
 %USERPROFILE%\.nexo-tesis\logs . En la pestana Documento pulsa
 "Copiar diagnostico" para compartirlo SIN incluir tu tesis ni tus claves.
 La "ventana blanca" de Copilot/Edge tambien se corrigio: Nexo cierra los
-procesos que el inicio cuando la conexion falla.
+procesos que el inicio SOLO cuando la conexion falla o se cancela. Si la
+captura TIENE EXITO, NO cierra Copilot ni Edge: la sesion vive ahi.
 
 AGENTE CONTINUO: SIN CUOTA DE PASOS
 -----------------------------------
@@ -113,16 +121,17 @@ COMO SABER SI TIENES LA VERSION CORREGIDA
 -----------------------------------------
 Haz doble clic en VERIFICAR.cmd . En la pantalla debe aparecer:
 
-    Nexo Tesis 0.4.1-dev (fase6-1) - comprobacion local (sin red)
+    Nexo Tesis 0.4.1-dev (fase6-2) - comprobacion local (sin red)
     ...
     Borradores largos: OK (hasta 20000 caracteres).
     Busqueda y plan: OK (consultas largas + apartados pendientes).
     Agente con herramientas: OK (inspeccionar, escribir, exportar, recibo).
     Fases 1-6: OK (estado, puertas, investigacion, bucle continuo sin cuota).
+    Sesion Copilot: OK (no se cierra tras capturar; solo se limpian fallos).
     Todo correcto.
 
-Si NO aparecen las CUATRO lineas "OK" o no dice
-"(fase6-1)", estas abriendo una copia VIEJA de Nexo. Cierra la
+Si NO aparecen las CINCO lineas "OK" o no dice
+"(fase6-2)", estas abriendo una copia VIEJA de Nexo. Cierra la
 aplicacion, descarga el ZIP nuevo y descomprimelo en una carpeta VACIA.
 Tus proyectos NO estan dentro de esa carpeta: estan en
 %USERPROFILE%\.nexo-tesis y se conservan.

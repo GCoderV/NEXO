@@ -237,6 +237,62 @@ def check_fase6():
     return []
 
 
+def check_copilot_stays_open():
+    """Offline proof: a captured session is NOT closed by this copy.
+
+    Regression for "luego de capturar la sesión de Copilot el bot cierra
+    automáticamente Copilot". Uses a synthetic Popen double; no Windows
+    process, browser, credential or network is touched.
+    """
+    import subprocess
+    import process_guard
+
+    class FakeProc:
+        def __init__(self):
+            self.terminated = False
+        def poll(self): return None
+        def terminate(self): self.terminated = True
+        def wait(self, timeout=None): return 0
+        def kill(self): self.terminated = True
+
+    real = subprocess.Popen
+    issues = []
+    try:
+        ok_proc = FakeProc()
+        subprocess.Popen = lambda *a, **k: ok_proc
+        def launch():
+            subprocess.Popen(['M365Copilot.exe'])
+            return 9222
+        process_guard.guarded_capture(launch, lambda port: 'sesion-sintetica')
+        if ok_proc.terminated:
+            issues.append('Esta copia CIERRA Copilot tras capturar la sesion: '
+                          'descarga el ZIP corregido y descomprimelo en una carpeta vacia.')
+        if process_guard.count():
+            issues.append('El seguimiento de procesos no se libero tras la captura.')
+
+        bad_proc = FakeProc()
+        subprocess.Popen = lambda *a, **k: bad_proc
+        def fail(port):
+            raise ValueError('cancelado')
+        try:
+            process_guard.guarded_capture(launch, fail)
+        except ValueError:
+            pass
+        if not bad_proc.terminated:
+            issues.append('Un intento fallido deja ventanas huerfanas abiertas.')
+
+        dialog = (ROOT / 'settings_dialog.py').read_text('utf-8')
+        if 'process_guard.close_all()' in dialog:
+            issues.append('El dialogo aun cierra Copilot al guardar o al cerrar la ventana.')
+    finally:
+        process_guard.stop_tracking()
+        with process_guard._lock:
+            process_guard._tracked.clear()
+        process_guard._original = None
+        subprocess.Popen = real
+    return issues
+
+
 def main():
     problems = []
     print(f'Nexo Tesis {VERSION} ({BUILD}) - comprobacion local (sin red)')
@@ -324,6 +380,15 @@ def main():
             problems += fase6_issues
         else:
             print('Fases 1-6: OK (estado, puertas, investigacion, bucle continuo sin cuota).')
+    try:
+        copilot_issues = check_copilot_stays_open()
+    except Exception as e:
+        problems.append('No se pudo comprobar que Copilot sigue abierto: ' + type(e).__name__ + ' ' + str(e)[:100])
+    else:
+        if copilot_issues:
+            problems += copilot_issues
+        else:
+            print('Sesion Copilot: OK (no se cierra tras capturar; solo se limpian fallos).')
     if problems:
         print('')
         print('PROBLEMAS ENCONTRADOS:')

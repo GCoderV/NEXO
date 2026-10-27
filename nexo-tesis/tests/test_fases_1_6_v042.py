@@ -399,7 +399,7 @@ class VersionAndWiringTests(unittest.TestCase):
         from version import VERSION, BUILD
         meta = json.loads((ROOT / 'VERSION.json').read_text('utf-8'))
         self.assertEqual(VERSION, '0.4.1-dev')
-        self.assertEqual(BUILD, 'fase6-1')
+        self.assertEqual(BUILD, 'fase6-2')
         self.assertEqual(meta['build'], BUILD)
 
     def test_app_wires_continuous_and_module_panel(self):

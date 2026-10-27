@@ -110,7 +110,8 @@
         }
       ]
     },
-    "local_continuity_tests": "369 unit tests passed, 2 skipped; synthetic fixtures only; Tk/Xvfb not run"
+    "local_continuity_tests": "369 unit tests passed, 2 skipped; synthetic fixtures only; Tk/Xvfb not run",
+    "fase6_2_tests": "476 passed / 2 skipped; 11 new synthetic regressions for the Copilot-close policy; no Windows/M365 verification"
   },
   "fixes": [
     "Project file library, reading state, version/provenance and route-scoped excerpt grants",
@@ -125,7 +126,8 @@
     "Copilot365 sin API key: el formulario de Cuentas oculta la clave, Guardar cuenta inicia Conectar escritorio M365 y Guardar y usar ofrece la conexion en lugar de pedir credenciales",
     "Tolerancia de formato: se valida un unico objeto JSON completo aunque venga envuelto en texto o cerca json, se unifican los contratos de tarea e incremental y el aviso de error indica un motivo fijo sin volcar la respuesta del modelo",
     "Auditoria de robustez: config concurrente con RLock e instantanea, cuarentena de config danado, ids F#/D# monotonos, proyecto legacy normalizado, expiracion Copilot tolerante, bookkeeping de rutas sin perder respuestas, version unica y preflight de carpeta de datos",
-    "Correccion del error real de formato en borradores largos (Marco teorico): limites unificados en limits.py, recorte visible en vez de rechazo, normalizacion de apartados/alias/fuentes, prompt con limite explicito, curacion de modelo Gemini 404 y reintento seguro ante 400 por response_format"
+    "Correccion del error real de formato en borradores largos (Marco teorico): limites unificados en limits.py, recorte visible en vez de rechazo, normalizacion de apartados/alias/fuentes, prompt con limite explicito, curacion de modelo Gemini 404 y reintento seguro ante 400 por response_format",
+    "fase6-2: Nexo ya no cierra Copilot/Edge tras capturar la sesion. process_guard.detach_all()/guarded_capture() conservan el proceso en exito; close_all() solo limpia huérfanos en fallo/cancelacion; el dialogo nunca cierra la sesion"
   ],
   "autonomy": {
     "opt_in_batch": true,
@@ -182,17 +184,18 @@
       "user_never_types_tokens_or_urls": true,
       "launch_and_capture_functions_unchanged": true,
       "verified_with_real_tk_and_m365": false
-    }
+    },
+    "session_kept_open_after_capture": true
   },
-  "release_status": "development build at releases/nexo-tesis-v0.4.1-dev-windows.zip (long-draft format fix, HTTP recovery and robustness audit); NOT a published release; remote Copilot continuity unverified",
+  "release_status": "development build at releases/nexo-tesis-v0.4.1-dev-windows.zip (fase6-2: captured Copilot session is NOT closed; long-draft format fix, HTTP recovery, robustness audit, Fases 0-6); NOT a published release; remote Copilot continuity unverified",
   "development_package": {
     "file": "releases/nexo-tesis-v0.4.1-dev-windows.zip",
     "prefix": "Nexo-Tesis-0.4.1-dev/",
     "builder": "tools/empaquetar_tesis.py",
-    "files": 111,
+    "files": 124,
     "runtime_only": true,
     "internal_sha256sums": true,
-    "tests_run_against_extracted_package": "467 passed / 2 skipped",
+    "tests_run_against_extracted_package": "476 passed / 2 skipped",
     "tk_interface_executed": false,
     "ready_to_use": {
       "quickstart": "LEER-PRIMERO.txt",
@@ -203,7 +206,8 @@
       "bundled_dependencies": "websocket-client and pypdf vendored in the package"
     },
     "self_check_branches_tested": "failure (Tk missing on Linux) and success (Tk simulated)",
-    "self_check_marker": "fase6-1 + 5 lineas OK (borradores, busqueda, herramientas, fases 1-6)"
+    "self_check_marker": "fase6-2 + 5 lineas OK (borradores, busqueda, herramientas, fases 1-6, sesion Copilot)",
+    "self_check_copilot_close_regression": true
   },
   "response_format": {
     "single_complete_json_object": true,
@@ -251,24 +255,49 @@
   "continuous_agent": {
     "no_step_quota": true,
     "completion": "project_state.verify() + deterministic gates",
-    "safety": ["wall clock", "stall after strategy changes", "hard fuse", "Detener", "human question"],
+    "safety": [
+      "wall clock",
+      "stall after strategy changes",
+      "hard fuse",
+      "Detener",
+      "human question"
+    ],
     "in_place_research": "research.research_for with per-query approval, 4 APIs, provenance"
   },
   "single_write_path": {
     "module": "project_state.commit_slice",
-    "modules": ["M1", "M2", "M3", "M4", "M5"],
+    "modules": [
+      "M1",
+      "M2",
+      "M3",
+      "M4",
+      "M5"
+    ],
     "invalidation_dag": "M1->M2..M5, M2->M3..M5, M3->M4,M5, M4->M5",
     "snapshots": 8
   },
   "agent_loop": {
-    "modules": ["document.py", "agent_tools.py"],
+    "modules": [
+      "document.py",
+      "agent_tools.py"
+    ],
     "max_passes": 12,
     "max_tools_per_pass": 4,
-    "stop_reasons": ["finalizar", "pregunta", "sin_herramientas", "limite_de_pasos", "sin_progreso"],
+    "stop_reasons": [
+      "finalizar",
+      "pregunta",
+      "sin_herramientas",
+      "limite_de_pasos",
+      "sin_progreso"
+    ],
     "receipt": "last_loop + last 5 loop_receipts",
-    "document_exports": ["Markdown", "HTML", "OOXML DOCX (stdlib zipfile)"],
+    "document_exports": [
+      "Markdown",
+      "HTML",
+      "OOXML DOCX (stdlib zipfile)"
+    ],
     "word_modified_by_agent": false,
     "research_report": "AGENTE-LOOP-Y-DOCUMENTO.md"
   },
-  "build": "fase6-1"
+  "build": "fase6-2"
 }

@@ -21,9 +21,9 @@ Código y contexto para continuar el desarrollo en una sesión limpia.
 >
 > **Descarga (build de desarrollo, no release):**
 > [nexo-tesis-v0.4.1-dev-windows.zip](releases/nexo-tesis-v0.4.1-dev-windows.zip)
-> (124 archivos, build `fase6-1`). Página autónoma con el ZIP embebido (sin
+> (124 archivos, build `fase6-2`). Página autónoma con el ZIP embebido (sin
 > GitHub ni servidor): [descarga/descargar-nexo-tesis.html](descarga/descargar-nexo-tesis.html).
-> SHA-256: `PENDIENTE`.
+> SHA-256: `958f4dc4a354d0c025ee7748aae860fd6ed8d08f3e9d2c42b3ca394fb3994cd7`.
 >
 > **Reconstrucción Fases 0–6.** Se corrigió el error real
 > `cannot use 'dict' as a dict key` (mensaje de Python 3.14) con un log de
@@ -36,8 +36,15 @@ Código y contexto para continuar el desarrollo en una sesión limpia.
 > fusible y botón Detener como topes de seguridad, no como cuota).
 > Informes: [RECONSTRUCCION-FASES-0-6.md](contexto/RECONSTRUCCION-FASES-0-6.md)
 > y [AGENTE-LOOP-Y-DOCUMENTO.md](contexto/AGENTE-LOOP-Y-DOCUMENTO.md).
-> 467 pruebas superadas / 2 omitidas. `VERIFICAR.cmd` debe mostrar `(fase6-1)`
-> y cuatro líneas `OK`.
+>
+> **Corrección `fase6-2`:** se eliminó el cierre automático de Copilot/Edge
+> después de capturar la sesión. En éxito Nexo **deja la ventana abierta** (la
+> conversación necesita su puerto de diagnóstico local); sólo limpia los
+> procesos huérfanos cuando la conexión falla o se cancela. `VERIFICAR.cmd`
+> comprueba esta política con dobles sintéticos de `Popen`.
+>
+> 476 pruebas superadas / 2 omitidas. `VERIFICAR.cmd` debe mostrar `(fase6-2)`
+> y cinco líneas `OK`, incluida «Sesión Copilot: OK».
 >
 > **Listo para usar:** descomprimir en una carpeta vacía y hacer doble clic en
 > `INICIAR-TESIS.cmd` (se autoverifica y abre la app). Requiere Python 3.11+ con

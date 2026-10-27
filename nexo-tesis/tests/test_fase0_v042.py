@@ -131,34 +131,104 @@ class DiagnosticsTests(unittest.TestCase):
 
 
 class ProcessGuardTests(unittest.TestCase):
-    def test_close_all_terminates_only_tracked_children(self):
-        class FakeProc:
-            def __init__(self):
-                self.terminated = False
-                self.killed = False
-            def poll(self): return None
-            def terminate(self): self.terminated = True
-            def wait(self, timeout=None): return 0
-            def kill(self): self.killed = True
-        import subprocess
-        original = subprocess.Popen
-        proc = FakeProc()
-        try:
-            process_guard.start_tracking()
-            process_guard._original = lambda *a, **k: proc
-            subprocess.Popen(['fake.exe'])
-            self.assertEqual(process_guard.count(), 1)
-            self.assertEqual(process_guard.close_all(), 1)
-            self.assertTrue(proc.terminated)
-            self.assertEqual(process_guard.count(), 0)
-        finally:
-            subprocess.Popen = original
-            process_guard.stop_tracking()
+    """Synthetic Popen doubles only: no Windows process is ever started here."""
 
-    def test_settings_dialog_closes_children_on_failure(self):
+    class FakeProc:
+        def __init__(self):
+            self.terminated = False
+            self.killed = False
+        def poll(self): return None
+        def terminate(self): self.terminated = True
+        def wait(self, timeout=None): return 0
+        def kill(self): self.killed = True
+
+    def setUp(self):
+        import subprocess
+        self._real_popen = subprocess.Popen
+        process_guard.stop_tracking()
+        with process_guard._lock:
+            process_guard._tracked.clear()
+        process_guard._original = None
+
+    def tearDown(self):
+        import subprocess
+        process_guard.stop_tracking()
+        with process_guard._lock:
+            process_guard._tracked.clear()
+        process_guard._original = None
+        subprocess.Popen = self._real_popen
+
+    def _fake_popen(self, proc):
+        """Make Popen return `proc`; start_tracking() wraps this factory."""
+        import subprocess
+        subprocess.Popen = lambda *a, **k: proc
+
+    def test_close_all_terminates_only_tracked_children(self):
+        import subprocess
+        proc = self.FakeProc()
+        self._fake_popen(proc)
+        process_guard.start_tracking()
+        subprocess.Popen(['fake.exe'])
+        self.assertEqual(process_guard.count(), 1)
+        self.assertEqual(process_guard.close_all(), 1)
+        self.assertTrue(proc.terminated)
+        self.assertEqual(process_guard.count(), 0)
+
+    def test_settings_dialog_keeps_copilot_alive_after_success(self):
+        """Regression: "luego de capturar la sesión el bot cierra Copilot".
+
+        The bug was close_all() in a finally block (it ran even on success)
+        plus close_all() when the settings dialog was closed. Both are gone:
+        success detaches, only failure/cancellation terminates, and the dialog
+        never terminates the captured session.
+        """
         source = (ROOT / 'settings_dialog.py').read_text('utf-8')
-        self.assertIn('process_guard.close_all()', source)
-        self.assertIn('finally:', source)
+        self.assertIn('process_guard.guarded_capture(launch,capture)', source)
+        self.assertNotIn('process_guard.close_all()', source)
+        self.assertIn('DEJA COPILOT ABIERTO', source)
+        close = source.split('    def close(self):', 1)[1].split('\n    def ', 1)[0]
+        self.assertIn('process_guard.stop_tracking()', close)
+        self.assertNotIn('close_all()', close)
+
+    def test_detach_all_releases_without_terminating(self):
+        import subprocess
+        proc = self.FakeProc()
+        self._fake_popen(proc)
+        process_guard.start_tracking()
+        subprocess.Popen(['fake-copilot.exe'])
+        self.assertEqual(process_guard.count(), 1)
+        self.assertEqual(process_guard.detach_all(), 1)
+        self.assertFalse(proc.terminated, 'a successful capture must NOT kill Copilot')
+        self.assertFalse(proc.killed)
+        self.assertEqual(process_guard.count(), 0)
+
+    def test_guarded_capture_success_keeps_process_alive(self):
+        import subprocess
+        proc = self.FakeProc()
+        self._fake_popen(proc)
+        def launch():
+            subprocess.Popen(['M365Copilot.exe'])
+            return 9222
+        self.assertEqual(process_guard.guarded_capture(
+            launch, lambda port: 'session-ok' if port == 9222 else None),
+            'session-ok')
+        self.assertFalse(proc.terminated)
+        self.assertFalse(proc.killed)
+        self.assertEqual(process_guard.count(), 0)
+
+    def test_guarded_capture_failure_terminates_orphans(self):
+        import subprocess
+        proc = self.FakeProc()
+        self._fake_popen(proc)
+        def launch():
+            subprocess.Popen(['msedge.exe'])
+            return 9333
+        def capture(port):
+            raise ValueError('cancelled / no probe observed')
+        with self.assertRaises(ValueError):
+            process_guard.guarded_capture(launch, capture)
+        self.assertTrue(proc.terminated)
+        self.assertEqual(process_guard.count(), 0)
 
 
 class AppWiringTests(unittest.TestCase):

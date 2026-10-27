@@ -40,7 +40,7 @@ BODY = """<body><main>
 <p class="meta">{size} bytes · {files} archivos · <span id="hash">verificando integridad…</span></p>
 <p class="meta">SHA-256 esperado: <code>{sha}</code></p>
 
-<div class="news"><strong>Novedades de esta copia:</strong> el punto muerto de la investigación está corregido (las consultas booleanas largas ya no se rechazan y se ejecutan realmente en Crossref); hay un botón <em>Buscar fuentes</em>; el planificador ya no dice «no hay tareas» mientras falten Instrumentos, Cronograma, Presupuesto, Anexos, Referencias o Antecedentes. Se añadió un <strong>agente continuo sin cuota de pasos</strong> que investiga en sitio y repite hasta verificar el trabajo terminado (inspeccionar, escribir, editar solo lo que falta, añadir/quitar apartados, generar el documento completo) y la pestaña <strong>Documento</strong> exporta Markdown, HTML y DOCX sin Word ni internet. <strong>Para confirmar que abres esta copia:</strong> ejecuta <code>VERIFICAR.cmd</code> y comprueba que dice <code>({build})</code> y las cuatro líneas <code>OK</code>. Si no aparecen, estás usando una carpeta antigua.</div>
+<div class="news"><strong>Corrección de esta copia ({build}):</strong> <strong>Nexo YA NO cierra Copilot automáticamente después de capturar la sesión.</strong> La limpieza de procesos estaba en un <code>finally</code> y mataba la ventana incluso cuando la conexión se guardaba bien; ahora la deja abierta (la conversación necesita su puerto de diagnóstico local) y sólo cierra las ventanas huérfanas de un intento fallido o cancelado. <strong>Déjala abierta</strong> mientras uses la cuenta. También siguen corregidos el punto muerto de la investigación (consultas booleanas largas ejecutadas en Crossref), el botón <em>Buscar fuentes</em>, el planificador que ya no dice «no hay tareas» mientras falten apartados, y el <strong>agente continuo sin cuota de pasos</strong> con la pestaña <strong>Documento</strong> (Markdown, HTML y DOCX sin Word ni internet). <strong>Para confirmar que abres esta copia:</strong> ejecuta <code>VERIFICAR.cmd</code> y comprueba que dice <code>({build})</code> y las cinco líneas <code>OK</code>, incluida <em>«Sesion Copilot: OK»</em>. Si no aparecen, estás usando una carpeta antigua.</div>
 
 <div class="box">
 <strong>Si el botón no descarga</strong> (algunos visores bloquean descargas):
@@ -109,7 +109,7 @@ def build():
             '<meta name="viewport" content="width=device-width,initial-scale=1">\n'
             '<title>Descarga directa · Nexo Tesis 0.4.1-dev</title>\n'
             '<style>' + CSS + '</style>\n</head>\n' +
-            BODY.format(build='fase6-1', b64=base64.b64encode(data).decode('ascii'),
+            BODY.format(build='fase6-2', b64=base64.b64encode(data).decode('ascii'),
                         size='{:,}'.format(len(data)).replace(',', '.'), files=files, sha=sha))
     OUT.parent.mkdir(parents=True, exist_ok=True)
     OUT.write_text(page, 'utf-8')

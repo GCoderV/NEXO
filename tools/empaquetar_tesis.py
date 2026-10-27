@@ -78,6 +78,13 @@ Las librerías `websocket` y `pypdf` ya vienen incluidas: no hay que instalar na
   «Copiar diagnóstico». Todas las fronteras de claves de diccionario usan
   `as_key()`. `process_guard.py` cierra las ventanas de Copilot/Edge huérfanas
   cuando falla la conexión; ahí estaba la «ventana blanca».
+- **fase6-2 (CORRECCIÓN IMPORTANTE): Nexo YA NO cierra Copilot después de
+  capturar la sesión.** La limpieza de la Fase 0 estaba en un `finally` y por eso
+  mataba también el proceso tras una captura CORRECTA, dejando inservible la
+  conexión recién guardada. Ahora `process_guard.guarded_capture()` desvincula
+  los procesos en éxito (`detach_all`) y sólo los termina en fallo/cancelación
+  (`close_all`); cerrar el diálogo nunca cierra Copilot. La sesión vive en esa
+  ventana: DÉJALA ABIERTA mientras uses la cuenta. `VERIFICAR.cmd` lo comprueba.
 - FASE 1: `project_state.commit_slice` es la UNICA vía de escritura. Cinco
   módulos M1–M5 con DAG de invalidación, snapshots antes de aplicar, deshacer
   y verificación determinista de finalización.
@@ -94,9 +101,10 @@ Las librerías `websocket` y `pypdf` ya vienen incluidas: no hay que instalar na
   el documento completo sigue siendo offline y sin dependencias.
 - FASE 5: pestaña Documento con estado M1–M5, confirmación y deshacer,
   recibo auditable, diálogos con dueño y una sola ventana.
-- FASE 6: `VERIFICAR.cmd` muestra `(fase6-1)` y ejecuta CINCO comprobaciones
-  funcionales sin red, incluido un bucle continuo que termina por verificación.
-- Pruebas locales: 467 superadas / 2 omitidas con fixtures sintéticas.
+- FASE 6: `VERIFICAR.cmd` muestra `(fase6-2)` y ejecuta CINCO comprobaciones
+  funcionales sin red, incluidos un bucle continuo que termina por verificación
+  y «Sesion Copilot: OK» (prueba con dobles de que la sesión NO se cierra).
+- Pruebas locales: 476 superadas / 2 omitidas con fixtures sintéticas.
 - Ideas funcionales de DoThesis, Loopy, agentic-thesis-writing y Academic
   Writing Toolkit, analizadas con metodología REA (ver
   RECONSTRUCCION-FASES-0-6.md, incluido en este paquete).

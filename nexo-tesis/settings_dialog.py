@@ -251,28 +251,35 @@ class SettingsDialog:
         if self.ap.get()!='Copilot365':raise ValueError('Selecciona Copilot365 como proveedor de la cuenta.')
         from copilot_socket import launch_desktop,launch_auth_window,capture_connection
         import process_guard
-        process_guard.start_tracking()
         mode=self.copilot_mode.get()
         intro=('Cierra primero Microsoft 365 Copilot.' if mode=='Escritorio M365' else 'Se abrirá Microsoft Edge en un perfil separado de Nexo. Sus cookies de inicio de sesión pueden persistir; cierra sesión allí si no deseas conservarlas.')
-        if not messagebox.askyesno('Conexión experimental a tu sesión',intro+' Nexo intentará abrirlo con diagnóstico SOLO local y observará su conexión sin recargar la ventana ni borrar sus datos. Inicia sesión tú mismo; no compartas tu contraseña ni tokens.\n\nDespués copia la frase de prueba y envíala manualmente en un chat nuevo, sin archivos adjuntos. No se automatiza escribir o leer el chat. Se capturará únicamente la conexión que transporte esa frase.\n\nAl caducar la sesión, Nexo podrá observar una renovación si Microsoft la produce en esa ventana y mantiene la misma cuenta. Si no ocurre, pedirá reconectar; no recargará la ventana. Cierra Copilot al terminar para cerrar su puerto de diagnóstico. ¿Autorizar?',parent=self.win):return
+        if not messagebox.askyesno('Conexión experimental a tu sesión',intro+' Nexo intentará abrirlo con diagnóstico SOLO local y observará su conexión sin recargar la ventana ni borrar sus datos. Inicia sesión tú mismo; no compartas tu contraseña ni tokens.\n\nDespués copia la frase de prueba y envíala manualmente en un chat nuevo, sin archivos adjuntos. No se automatiza escribir o leer el chat. Se capturará únicamente la conexión que transporte esa frase.\n\nAl caducar la sesión, Nexo podrá observar una renovación si Microsoft la produce en esa ventana y mantiene la misma cuenta. Si no ocurre, pedirá reconectar; no recargará la ventana.\n\nNexo NO cerrará Copilot: déjalo abierto mientras uses esta cuenta, porque la conversación necesita su ventana. Tú decides cuándo cerrarla al terminar la sesión. ¿Autorizar?',parent=self.win):return
         self.probe_text='Responde solo OK. NEXO CONEXION '+uuid.uuid4().hex[:12];self.probe.set(self.probe_text);self.copy_probe()
         self.note.set('Frase copiada. Espera a que cargue Copilot normalmente, abre un chat NUEVO y envíala allí manualmente. Límite: 3 minutos.')
         aid=self.account_id;alias=self.alias.get() or 'Microsoft 365';remember=self.remember.get();probe=self.probe_text;enabled=self.account_enabled.get()
+        def launch():
+            return launch_desktop() if mode=='Escritorio M365' else launch_auth_window(self.app.store.root)
+        def capture(port):
+            return capture_connection(port,probe=probe,stop=self.cancel,on_ready=lambda:self.progress.put('Observación preparada SIN recarga. Abre un chat NUEVO en Copilot y envía la frase copiada.'))
         def work():
-            try:
-                return capture_connection(launch_desktop() if mode=='Escritorio M365' else launch_auth_window(self.app.store.root),probe=probe,stop=self.cancel,on_ready=lambda:self.progress.put('Observación preparada SIN recarga. Abre un chat NUEVO en Copilot y envía la frase copiada.'))
-            finally:
-                # A failed/cancelled capture must not leave a blank WebView2 window.
-                process_guard.close_all()
+            # SUCCESS detaches Copilot/Edge (keeps it alive); only a failed or
+            # cancelled attempt terminates the windows Nexo started. Never put
+            # close_all() in a finally here: it broke the captured session.
+            return process_guard.guarded_capture(launch,capture)
         def done(secret):
             self.account_id=self.config.account('Copilot365',alias,secret,remember,aid,enabled);self.focus_account(self.account_id)
-            self.note.set('Conexión observada y guardada SIN API key. Esto aún no confirma inferencia independiente. Copilot ya aparece en la lista. Pulsa Guardar y usar, cierra esta ventana y prueba una solicitud en Nexo.')
+            self.note.set('Conexión observada y guardada SIN API key. Esto aún no confirma inferencia independiente. Copilot ya aparece en la lista. Pulsa Guardar y usar, cierra esta ventana y prueba una solicitud en Nexo. DEJA COPILOT ABIERTO: Nexo no lo cerrará.')
         self.async_job(work,done)
     def close(self):
         self.cancel.set();self.secret.set('');self.app.update_provider()
         try:
             import process_guard
-            process_guard.close_all()
+            # Stop wrapping Popen, but NEVER terminate Copilot here. A captured
+            # session lives in that process; closing this dialog must not break
+            # the very next turn. If a capture is still running we leave the
+            # wrapper alone: guarded_capture() restores it on success/failure
+            # and closes only the orphans of a failed attempt.
+            if not self.working:process_guard.stop_tracking()
         except Exception:
             pass
         if self.async_timer:self.win.after_cancel(self.async_timer)

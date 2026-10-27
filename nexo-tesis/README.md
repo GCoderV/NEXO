@@ -241,14 +241,15 @@ nunca se modifica. Ideas funcionales de proyectos abiertos (DoThesis, Loopy,
 agentic-thesis-writing, Academic Writing Toolkit, OpenDraft) en
 `AGENTE-LOOP-Y-DOCUMENTO.md`, incluido en este paquete.
 
-`VERIFICAR.cmd` muestra `(fase6-1)` y ejecuta tres comprobaciones
-funcionales sin red: borradores largos, consultas largas + planificador y un
-bucle completo del agente con exportación válida. **467 pruebas** superadas /
+`VERIFICAR.cmd` muestra `(fase6-2)` y ejecuta cinco comprobaciones
+funcionales sin red: borradores largos, consultas largas + planificador, un
+bucle completo del agente con exportación válida, el núcleo de las fases 1–6 y
+la prueba de que una sesión Copilot capturada **no se cierra**. **476 pruebas** superadas /
 2 omitidas con fixtures sintéticas. Sin verificación real de Tk, Word COM,
 DPAPI, Microsoft 365 Copilot ni de que Word abra el DOCX generado en este
 entorno.
 
-## Reconstrucción por fases (build `fase6-1`)
+## Reconstrucción por fases (build `fase6-2`)
 
 Tras el error real `cannot use 'dict' as a dict key (unhashable type: 'dict')`
 (mensaje nuevo de Python 3.14) y una ventana blanca huérfana de Copilot/Edge, se
@@ -260,7 +261,9 @@ Academic Writing Toolkit, analizadas con metodología REA. Detalle completo en
   en `~/.nexo-tesis/logs/` y la UI muestra un mensaje útil con «Copiar
   diagnóstico» en lugar del mensaje crudo del intérprete. `as_key()` normaliza
   todas las fronteras de claves de diccionario. `process_guard.py` cierra los
-  procesos de Copilot/Edge que Nexo inició cuando la conexión falla.
+  procesos de Copilot/Edge que Nexo inició **sólo cuando la conexión falla o se
+  cancela**; tras una captura correcta los desvincula sin cerrarlos, porque la
+  sesión guardada vive en ese proceso (corrección `fase6-2`).
 - **Fase 1 — Estado único.** `project_state.commit_slice()` es la única vía de
   escritura: cinco módulos M1–M5, DAG de invalidación, snapshots, deshacer y
   verificación determinista. Proyectos 0.4.x migran sin perder borradores.
@@ -279,9 +282,10 @@ Academic Writing Toolkit, analizadas con metodología REA. Detalle completo en
   calidad adjuntas. Ocultar un apartado conserva su borrador.
 - **Fase 5 — UI.** Pestaña Documento con estado M1–M5, «Agente continuo · hasta
   terminar», confirmar módulo, deshacer, recibo y diagnóstico.
-- **Fase 6 — Validación.** 467 pruebas / 2 omitidas. `VERIFICAR.cmd` muestra
-  `(fase6-1)` y ejecuta cinco comprobaciones funcionales sin red, incluido un
-  bucle continuo que termina por verificación.
+- **Fase 6 — Validación.** 476 pruebas / 2 omitidas. `VERIFICAR.cmd` muestra
+  `(fase6-2)` y ejecuta cinco comprobaciones funcionales sin red, incluidos un
+  bucle continuo que termina por verificación y la comprobación de que Copilot
+  sigue abierto tras capturar la sesión.
 
 **Uso del modo continuo:** Documento → «Agente continuo · hasta terminar» →
 aprobar el conjunto. Verás y autorizarás cada consulta antes de que salga a la

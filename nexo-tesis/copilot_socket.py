@@ -117,24 +117,9 @@ def sanitize_frame(frame):
     if len(json.dumps(out))>60000:raise ValueError('Invocación demasiado grande.')
     return out
 
-_LAUNCHED=[]  # Fase 0: no orphan windows after a failed connection.
-
-def close_launched():
-    """Terminate browsers/consoles Nexo started. Called in a finally block."""
-    dead=[]
-    for proc in list(_LAUNCHED):
-        try:
-            if proc.poll() is None:
-                proc.terminate()
-                try:proc.wait(timeout=3)
-                except Exception:proc.kill()
-        except Exception:
-            pass
-        dead.append(proc)
-    for proc in dead:
-        try:_LAUNCHED.remove(proc)
-        except ValueError:pass
-    return len(dead)
+# Fase 0 (corregido): el seguimiento y la limpieza de procesos viven en
+# process_guard.guarded_capture(). No cerrar aquí: tras una captura correcta
+# Copilot/Edge DEBE seguir abierto, porque Nexo reutiliza su puerto local.
 
 def launch_desktop():
     if os.name!='nt':raise ValueError('Conectar la aplicación de escritorio requiere Windows. No se ha iniciado ningún programa.')
