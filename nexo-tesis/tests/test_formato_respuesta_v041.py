@@ -102,10 +102,17 @@ class UnpackTaskTests(unittest.TestCase):
             unpack(json.dumps({'text': 'Texto.', 'exec': 'rm -rf'}), TASK)
 
     def test_invalid_draft_still_rejected(self):
+        # An empty task text is not a format crash any more: it yields no draft
+        # and the workflow handles it as "no progress" with one correction.
+        self.assertEqual(unpack(json.dumps({'text': '', 'reply': 'sin contenido'}), TASK)['drafts'], [])
+        # In a task the target section is known, so a wrong label is normalized.
+        r = unpack(json.dumps({'drafts': [{'section': 'no_existe', 'text': 'Texto útil.'}]}), TASK)
+        self.assertEqual(r['drafts'][0]['section'], 'delimitacion')
+        # In dialogue mode an unknown section or empty text is still rejected.
         with self.assertRaises(ValueError):
-            unpack(json.dumps({'text': ''}), TASK)
+            unpack(json.dumps({'reply': 'ok', 'drafts': [{'section': 'no_existe', 'text': 'Texto.'}]}))
         with self.assertRaises(ValueError):
-            unpack(json.dumps({'drafts': [{'section': 'no_existe', 'text': 'Texto.'}]}), TASK)
+            unpack(json.dumps({'reply': 'ok', 'drafts': [{'section': 'objetivos', 'text': ''}]}))
 
     def test_reason_never_contains_model_output(self):
         secretish = 'NuncaMostrarEsteTexto'

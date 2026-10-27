@@ -46,7 +46,13 @@ Las librerías `websocket` y `pypdf` ya vienen incluidas: no hay que instalar na
   extracciones y proyectos antiguos, expiración de Copilot robusta, bookkeeping
   de rutas que no pierde respuestas, versión única y comprobación previa de la
   carpeta de datos. Detalle: `contexto/AUDITORIA-ROBUSTEZ.md` en el repo.
-- Pruebas locales: 350 superadas / 2 omitidas con fixtures sintéticas.
+- Corregido el error real «La respuesta no cumple el formato académico» en
+  apartados largos: límites unificados en `limits.py` (borrador 20 000
+  caracteres), recorte visible en vez de rechazo, normalización de etiquetas,
+  alias en español y fuentes irregulares, y prompt que informa del límite.
+  También se curan automáticamente el 404 de modelo Gemini obsoleto y el 400
+  por `response_format`, con una sola repetición segura en cada caso.
+- Pruebas locales: 366 superadas / 2 omitidas con fixtures sintéticas.
 - **NO verificado**: sesión real de Copilot, recuerdo del servidor, Word COM,
   DPAPI, PowerShell de Windows ni la interfaz Tk en este entorno.
 - La cabecera `X-RoutingParameter-SessionKey` es evidencia de terceros sin
@@ -68,7 +74,7 @@ FORBIDDEN_PREFIXES = ('tests/', 'reports/', '__pycache__/', 'copilot-login/', 'm
 FORBIDDEN_NAMES = ('.gitignore', '.env', 'config.json', 'preferences.json',
                    'projects.sqlite3', 'SHA256SUMS.txt')
 # Conveniencias de "listo para usar" añadidas en 0.4.1-dev.
-READY_EXTRAS = ('LEER-PRIMERO.txt', 'VERIFICAR.cmd', 'verificar_instalacion.py', 'version.py')
+READY_EXTRAS = ('LEER-PRIMERO.txt', 'VERIFICAR.cmd', 'verificar_instalacion.py', 'version.py', 'limits.py')
 
 
 def runtime_paths():
@@ -95,6 +101,8 @@ def build():
     entries['VERSION.json'] = (SRC / 'VERSION.json').read_bytes()
     entries['CONTINUIDAD-COPILOT.md'] = (
         ROOT / 'contexto' / 'CONTINUIDAD-COPILOT-IMPLEMENTACION.md').read_bytes()
+    entries['INCIDENCIA-FORMATO-BORRADOR.md'] = (
+        ROOT / 'contexto' / 'INCIDENCIA-FORMATO-BORRADOR.md').read_bytes()
     manifest = ''.join(
         hashlib.sha256(entries[rel]).hexdigest() + '  ' + rel + '\n'
         for rel in sorted(entries))

@@ -9,6 +9,23 @@ class RoutedAPI:
         self.provider=routes[0]['provider'];self.model=routes[0]['model'];self.endpoint=routes[0]['endpoint'];self.key=''
         self.instructions='';self.last_usage={};self.calls=0;self.attempts=0;self.trace=[];self.stop=threading.Event();self.emit=lambda s:None;self.started=None;self.remote={};self.project_id='';self.route_identity=''
     def redact(self,text):return self.config.redact(text)
+    def _apply_model_fix(self,rid,model):
+        """Persist the replacement model named by the provider on a 404.
+
+        Same account and same provider: this does not change the authorized
+        recipient, it only replaces an id that no longer exists.
+        """
+        try:
+            with edit(self.config):
+                for route in self.config.data['routes']:
+                    if route['id']==rid:route['model']=model
+                current=self.config.data['current']
+                if current.get('route_id')==rid:current['model']=model
+                self.config.flush()
+        except Exception:pass
+        for route in self.routes:
+            if route['id']==rid:route['model']=model
+        self.emit('Modelo obsoleto sustituido por '+model+'; se conservó la misma cuenta.')
     def request(self,conversation,declarations):
         if self.started is None:self.started=time.monotonic()
         self.last_usage={};last=None
@@ -28,6 +45,7 @@ class RoutedAPI:
             api=self.factory(r['provider'],key,r['model'],r['endpoint'],max(10,min(90,int(remaining))))
             api.timeout=max(1,min(api.timeout,remaining));api.instructions=self.instructions;api.stop=self.stop
             api.remote=self.remote.setdefault(aid,{}) if aid else {};api.project_id=self.project_id
+            if r['provider']=='Gemini':api.on_model_fix=lambda new,rid=rid:self._apply_model_fix(rid,new)
             if r['provider']=='Copilot365':
                 def update(secret,aid=aid):
                     from copilot_socket import identity_fingerprint

@@ -9,6 +9,7 @@ from pathlib import Path
 import re
 import sqlite3
 import uuid
+from limits import MAX_DRAFT_CHARS
 
 MAX_PROJECT=3_000_000
 FACT_KEYS=('nivel','institucion','programa','tipo_trabajo','metodologia','contexto','poblacion','datos','guia','alcance','objetivo_usuario')
@@ -126,7 +127,7 @@ class ProjectStore:
         if d['status']=='necesita_revision':raise ValueError('Apartado desactualizado: revísalo y guarda una versión antes de aprobarlo.')
         d['status']='aprobado_usuario';d['approved_at']=now();self.save(p,'draft-approved',section)
     def update_draft(self,p,section,text):
-        if section not in SECTIONS or not text.strip() or len(text)>20000:raise ValueError('Apartado inválido o demasiado largo.')
+        if section not in SECTIONS or not text.strip() or len(text)>MAX_DRAFT_CHARS:raise ValueError('Apartado inválido o demasiado largo.')
         old=p['drafts'].get(section)
         revisions=(old.get('versions',[])+[{'text':old['text'],'time':now(),'status':old['status']}])[-5:] if old else []
         p['drafts'][section]={'text':text,'status':'borrador','sources':[],'edited_by_user':True,'material_ids':(old or {}).get('material_ids',[]),'warning':'Edición manual: revisar afirmaciones y referencias.','versions':revisions,'time':now()};self.save(p,'draft-edited',section)

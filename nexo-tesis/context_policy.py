@@ -1,4 +1,5 @@
 """Task-selected context with explicit extraction limits, no full history dump."""
+from limits import MAX_CONTEXT_CHARS
 import copy,hashlib,json,re,unicodedata
 from datetime import datetime,timezone
 from project_store import FACT_KEYS,SECTIONS,LABELS
@@ -41,9 +42,9 @@ def build_context(p,user_text,research_enabled=False,search_notice='',origin='us
     def encoded():
         data['available_source_ids']=[s['id'] for s in data['sources']]
         return json.dumps(data,ensure_ascii=False,separators=(',',':'))
-    if len(encoded())>24000:data['recent_messages']=[];data['sources']=sources[:2]
-    if len(encoded())>24000:data['recent_drafts']={};data['context_note']='Otros borradores omitidos por límite. El texto completo de la tarea se conserva.'
-    if len(encoded())>24000:raise ValueError('El contexto esencial supera 24000 caracteres; divide la tarea o el material. No se recortó el texto a revisar.')
+    if len(encoded())>MAX_CONTEXT_CHARS:data['recent_messages']=[];data['sources']=sources[:2]
+    if len(encoded())>MAX_CONTEXT_CHARS:data['recent_drafts']={};data['context_note']='Otros borradores omitidos por límite. El texto completo de la tarea se conserva.'
+    if len(encoded())>MAX_CONTEXT_CHARS:raise ValueError('El contexto esencial supera '+str(MAX_CONTEXT_CHARS)+' caracteres; divide la tarea o el material. No se recortó el texto a revisar.')
     return encoded()
 
 # --- Incremental context on a VERIFIED thread ---------------------------------
@@ -67,7 +68,7 @@ def incremental(full_context,ledger):
 
     The FULL context is always built first, so permission checks and size limits still
     run. Only unchanged sections are omitted; the delta is never larger than the full
-    context and never exceeds the same 24000-character limit.
+    context and never exceeds the same MAX_CONTEXT_CHARS limit.
     """
     if not isinstance(ledger,dict) or not isinstance(ledger.get('snapshot'),dict):return None
     data=json.loads(full_context);previous=ledger['snapshot']
@@ -82,7 +83,7 @@ def incremental(full_context,ledger):
          'task_section':(data.get('work_order') or {}).get('section'),
          'changes':changes,'removed':removed}
     raw=json.dumps(out,ensure_ascii=False,separators=(',',':'))
-    if len(raw)>24000 or len(raw)>=len(full_context):return None
+    if len(raw)>MAX_CONTEXT_CHARS or len(raw)>=len(full_context):return None
     return raw
 
 def record_ledger(p,full_context,incremental_sent=False):

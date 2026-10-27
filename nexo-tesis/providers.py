@@ -30,9 +30,37 @@ def read_bounded(response,limit,deadline,stop=None):
         total+=len(chunk);parts.append(chunk)
     return b''.join(parts)
 
-def http_error(error,key):
+def _gemini_replacement(details):
+    """Model id the provider itself recommends in a 404; '' if not explicit."""
+    try:message=json.loads(details).get('error',{}).get('message','')
+    except (ValueError,AttributeError):return ''
+    if not isinstance(message,str) or 'no longer available' not in message.lower():return ''
+    found=re.search(r'use\s+models/([A-Za-z0-9._:-]{3,80})',message)
+    if not found:return ''
+    candidate=found.group(1).removeprefix('models/')
+    return candidate if re.fullmatch(r'[A-Za-z0-9._:-]{3,80}',candidate) else ''
+
+def _short_reason(details,key):
+    """Bounded, redacted provider message. Never returns keys, URLs or long tokens."""
+    text=details or ''
+    if key:text=text.replace(key,'[CLAVE OMITIDA]')
+    try:
+        obj=json.loads(text)
+        if isinstance(obj,dict):
+            err=obj.get('error',obj)
+            text=str(err.get('message','') if isinstance(err,dict) else err)[:400]
+    except (ValueError,AttributeError):text=text[:400]
+    text=re.sub(r'https?://\S+','[URL OMITIDA]',text)
+    text=re.sub(r'\s+',' ',text).strip()
+    text=re.sub(r'[A-Za-z0-9_\-]{40,}','[TEXTO OMITIDO]',text)
+    return text[:240]
+
+def http_error(error,key,details=''):
     # Never expose response bodies: providers may echo headers or signed URLs.
     code=error.code
+    if code==400:
+        reason=_short_reason(details,key)
+        return ProviderError('El proveedor rechazó la petición (HTTP 400)'+(': '+reason if reason else '')+'; no se repitió automáticamente.')
     if code==403:return ProviderError('Acceso a este modelo rechazado (403). Revisa permisos.',kind='access',retryable=True)
     if code==401:return ProviderError(f'Acceso rechazado ({code}). Revisa credencial y permisos del modelo.',kind='auth',retryable=True)
     if code in (402,429):
@@ -160,28 +188,59 @@ class API:
         headers['Content-Type']='application/json';headers['User-Agent']='NexoTesis/0.2'
         req=urllib.request.Request(url,json.dumps(payload).encode(),headers)
         deadline=time.monotonic()+self.timeout
-        try:
-            with open_remote(req,timeout=self.timeout) as response:raw=read_bounded(response,2_000_000,deadline,getattr(self,'stop',None))
-            if len(raw)>2_000_000:raise RuntimeError('Respuesta demasiado grande.')
-            body=json.loads(raw)
-        except urllib.error.HTTPError as e:
-            details=e.read(8192).decode('utf-8','replace')
-            if self.key:details=details.replace(self.key,'[CLAVE OMITIDA]')
-            if e.code==400:
-                try:error=json.loads(details).get('error',{})
-                except (ValueError,AttributeError):error={}
-                if isinstance(error,dict) and error.get('code')=='tool_use_failed':
-                    reason=str(error.get('message','Argumentos de herramienta inválidos.'))[:1200]
-                    raise RuntimeError('API HTTP 400: el proveedor rechazó una llamada de herramienta. '+reason+
-                        '\nLa llamada rechazada no se ejecutó en Nexo. No se reintentaron ni repitieron las acciones anteriores; podrían haber dejado efectos. Revisa el estado antes de continuar.') from None
-            if e.code==404 and self.provider=='Gemini':
-                try:description=json.loads(details).get('error',{}).get('message','')
-                except (ValueError,AttributeError):description=''
-                hint=('Selecciona gemini-3.8-flash con el botón Sugerido.' if self.model=='gemini-2.5-flash' else 'Comprueba el identificador y la disponibilidad del modelo en tu cuenta.')
-                raise ProviderError(f'Gemini: modelo {self.model} no disponible (HTTP 404). '+hint+' Revisa Modelos y cuentas y sigue en el MISMO proyecto.',kind='unavailable',retryable=True) from None
-            raise http_error(e,self.key) from None
-        except (urllib.error.URLError,TimeoutError,OSError):
-            raise ProviderError('La conexión terminó sin respuesta confirmada. El servidor podría haber procesado la petición; revisa antes de Reanudar.',kind='uncertain') from None
+        attempts=0
+        while True:
+            try:
+                with open_remote(req,timeout=self.timeout) as response:raw=read_bounded(response,2_000_000,deadline,getattr(self,'stop',None))
+                if len(raw)>2_000_000:raise RuntimeError('Respuesta demasiado grande.')
+                body=json.loads(raw)
+                break
+            except urllib.error.HTTPError as e:
+                attempts+=1
+                details=e.read(8192).decode('utf-8','replace')
+                if self.key:details=details.replace(self.key,'[CLAVE OMITIDA]')
+                if e.code==400:
+                    try:error=json.loads(details).get('error',{})
+                    except (ValueError,AttributeError):error={}
+                    if isinstance(error,dict) and error.get('code')=='tool_use_failed':
+                        reason=str(error.get('message','Argumentos de herramienta inválidos.'))[:1200]
+                        raise RuntimeError('API HTTP 400: el proveedor rechazó una llamada de herramienta. '+reason+
+                            '\nLa llamada rechazada no se ejecutó en Nexo. No se reintentaron ni repitieron las acciones anteriores; podrían haber dejado efectos. Revisa el estado antes de continuar.') from None
+                if attempts==1:
+                    # A 404 "model no longer available" processed nothing. If the
+                    # provider names the replacement AND the caller can persist it,
+                    # heal the route and send this one request to the new model.
+                    if e.code==404 and self.provider=='Gemini':
+                        replacement=_gemini_replacement(details)
+                        fixer=getattr(self,'on_model_fix',None)
+                        if (replacement and replacement!=self.model and callable(fixer)
+                                and not self.model.startswith('gemma-') and not replacement.startswith('gemma-')):
+                            try:fixer(replacement)
+                            except Exception:pass
+                            self.model=replacement
+                            url='https://generativelanguage.googleapis.com/v1beta/models/'+urllib.parse.quote(replacement,safe='')+':generateContent'
+                            req=urllib.request.Request(url,json.dumps(payload).encode(),headers)
+                            deadline=time.monotonic()+self.timeout
+                            continue
+                    # Many providers reject JSON-mode parameters. A 400 processes
+                    # nothing, so one retry without that optional flag is safe.
+                    if e.code==400 and ('response_format' in details.lower() or 'responsemimetype' in details.lower() or 'response_mime_type' in details.lower()):
+                        changed=False
+                        if self.provider=='Gemini' and isinstance(payload.get('generationConfig'),dict):
+                            changed=payload['generationConfig'].pop('responseMimeType',None) is not None
+                        elif self.provider!='Gemini' and payload.pop('response_format',None) is not None:changed=True
+                        if changed:
+                            req=urllib.request.Request(url,json.dumps(payload).encode(),headers)
+                            deadline=time.monotonic()+self.timeout
+                            continue
+                if e.code==404 and self.provider=='Gemini':
+                    try:description=json.loads(details).get('error',{}).get('message','')
+                    except (ValueError,AttributeError):description=''
+                    hint=('Selecciona gemini-3.8-flash con el botón Sugerido.' if self.model=='gemini-2.5-flash' else 'Comprueba el identificador y la disponibilidad del modelo en tu cuenta.')
+                    raise ProviderError(f'Gemini: modelo {self.model} no disponible (HTTP 404). '+hint+' Revisa Modelos y cuentas y sigue en el MISMO proyecto.',kind='unavailable',retryable=True) from None
+                raise http_error(e,self.key,details) from None
+            except (urllib.error.URLError,TimeoutError,OSError):
+                raise ProviderError('La conexión terminó sin respuesta confirmada. El servidor podría haber procesado la petición; revisa antes de Reanudar.',kind='uncertain') from None
         self.capture_usage(body)
         if self.provider=='Gemini':
             candidates=body.get('candidates',[])

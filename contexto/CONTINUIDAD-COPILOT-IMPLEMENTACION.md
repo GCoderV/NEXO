@@ -212,6 +212,20 @@ pulsar **Reanudar**; solo se repite el apartado pendiente. Si el motivo dice
 incrementales, «Conservar el hilo y reenviar contexto completo» en «Hilo
 Copilot» restaura el contrato completo. Todo esto está en `LEER-PRIMERO.txt`.
 
+## Incidencia posterior: borradores largos y errores HTTP
+
+El usuario envió la respuesta real que seguía fallando: un JSON válido con un
+`text` de ~11 000 caracteres para **Marco teórico**. La causa no era el JSON,
+sino el límite de 10 000 caracteres de `unpack`, inferior al del editor
+(20 000) y ausente del contrato `DRAFT`. Se unificaron los límites en
+`limits.py`, se normaliza el borrador (etiquetas, alias en español, fuentes
+irregulares, `section` tomado del `work_order`) y un exceso de longitud se
+recorta con aviso visible en lugar de rechazarse. También se curan el 404 de
+modelo Gemini obsoleto —el proveedor nombra el sustituto— y el 400 por
+`response_format`, con una sola repetición segura en cada caso. El detalle, las
+pruebas y las decisiones están en
+[INCIDENCIA-FORMATO-BORRADOR.md](INCIDENCIA-FORMATO-BORRADOR.md).
+
 ## Lo que aún requiere la sesión del usuario
 
 Sigue vigente la «Prueba de aceptación real» del diagnóstico. En resumen, con un

@@ -53,22 +53,18 @@ usarlo, elige cualquier otro proveedor (estos SI usan API key).
 SI APARECE "LA RESPUESTA NO CUMPLE EL FORMATO ACADEMICO"
 --------------------------------------------------------
 No se perdio nada: los apartados ya guardados siguen ahi y Word NO se toco.
-El modelo respondio con texto libre en vez del JSON que Nexo necesita.
-Esta version acepta el JSON aunque venga dentro de texto o de un bloque de
-codigo json (tipico de Copilot365) y muestra el MOTIVO exacto del rechazo.
+Esta version corrige la causa mas frecuente: un borrador largo (por ejemplo
+Marco teorico) era rechazado por superar 10000 caracteres, aunque el editor
+admite 20000. Ahora los limites estan unificados y el aviso del propio
+borrador indica si hubo que recortarlo. Ya no deberia aparecer este error.
 
 Para continuar SIN reiniciar el conjunto:
 1. (Opcional) Abre "Modelos y cuentas" y elige otro modelo/ruta.
 2. Pulsa "Reanudar". Solo se repite el apartado pendiente; NO se repiten
    los ya guardados, las busquedas ni las operaciones de Word.
-3. Si vuelve a fallar, lee el motivo en el REGISTRO del chat:
-   - "no se encontro un JSON completo": el modelo respondio en prosa.
-     Cambia de modelo o de ruta.
-   - "el borrador propuesto no cumple el contrato": falto el texto del
-     apartado. Prueba otra ruta o revisa si faltan datos en Memoria.
-4. Si activaste los mensajes incrementales en "Hilo Copilot", puedes
-   volver a "Conservar el hilo y reenviar contexto completo": el
-   recordatorio corto a veces hace que el modelo olvide el formato.
+3. Si aun asi vuelve a fallar, lee el MOTIVO entre parentesis del REGISTRO.
+   Indica exactamente que parte de la respuesta no se pudo usar, sin mostrar
+   el contenido del modelo.
 
 COMPROBACIONES ANTES DE ABRIR
 -----------------------------
@@ -82,4 +78,5 @@ y empieza vacio: vuelve a crear tus cuentas en Modelos y cuentas. Ya no queda
 bloqueado para siempre. No borres la carpeta .nexo-tesis sin respaldarla.
 
 Archivos: README.md (manual completo), CONTINUIDAD-COPILOT.md (cambios y prueba),
+INCIDENCIA-FORMATO-BORRADOR.md (causa y correccion del error de formato),
 VERSION.json, SHA256SUMS.txt (integridad) y LICENSE + licencias de pypdf/websocket.

@@ -21,13 +21,15 @@ Código y contexto para continuar el desarrollo en una sesión limpia.
 >
 > **Descarga (build de desarrollo, no release):**
 > [nexo-tesis-v0.4.1-dev-windows.zip](releases/nexo-tesis-v0.4.1-dev-windows.zip)
-> (592,107 bytes, 112 archivos). SHA-256: `ab3127018a1394f6e5edb4ad40cb785e25ab2de6a678ca40056105605aa83c86`.
-> Incluye la corrección de Copilot365 sin API key, la tolerancia a JSON envuelto
-> y la **auditoría de robustez** (configuración concurrente, recuperación de
-> `config.json`, ids monótonos, compatibilidad de proyectos antiguos, versión
-> única y comprobación previa de la carpeta de datos).
-> Informe: [contexto/AUDITORIA-ROBUSTEZ.md](contexto/AUDITORIA-ROBUSTEZ.md).
-> 350 pruebas superadas / 2 omitidas. Ver `LEER-PRIMERO.txt`.
+> (598,601 bytes, 114 archivos). SHA-256: `53e0db6c6339e1c23c811b9d5d56433fd4d94c4774fc5dcde520a5454b305226`.
+> **Corregido el error «La respuesta no cumple el formato académico» en
+> apartados largos**: límites unificados en `limits.py` (borrador de 20 000
+> caracteres), recorte visible en vez de rechazo y normalización de etiquetas,
+> alias y fuentes. También se curan el 404 de modelo Gemini obsoleto y el 400
+> por `response_format`. Además incluye la auditoría de robustez.
+> Informes: [INCIDENCIA-FORMATO-BORRADOR.md](contexto/INCIDENCIA-FORMATO-BORRADOR.md)
+> y [AUDITORIA-ROBUSTEZ.md](contexto/AUDITORIA-ROBUSTEZ.md).
+> 366 pruebas superadas / 2 omitidas. Ver `LEER-PRIMERO.txt`.
 > **Listo para usar:** descomprimir en una carpeta vacía y hacer doble clic en
 > `INICIAR-TESIS.cmd` (se autoverifica y abre la app). Requiere Python 3.11+ con
 > Tkinter; no instala nada. Incluye `LEER-PRIMERO.txt`, `VERIFICAR.cmd`, aviso de

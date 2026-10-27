@@ -7,6 +7,7 @@ import re
 import threading
 import uuid
 import unicodedata
+from limits import MAX_RESPONSE_CHARS, MAX_DRAFT_CHARS, MAX_REPLY_CHARS
 from project_store import FACT_KEYS, SECTIONS, LABELS, now, message, set_fact
 import bibliography
 import context_policy
@@ -80,6 +81,9 @@ FORMAT_REASONS={
  'Falta explicación utilizable.':'falta el campo reply',
  'Propuesta de dato inválida.':'un dato propuesto no es válido',
  'Propuesta de apartado inválida.':'el borrador propuesto no cumple el contrato',
+ 'Borrador con estructura inválida.':'un borrador no es un objeto JSON',
+ 'Apartado de borrador no reconocido.':'el apartado indicado no coincide con los permitidos',
+ 'Texto de borrador ausente.':'falta el texto del borrador',
  'Bloque de preguntas inválido.':'el bloque de preguntas no es válido',
  'Pregunta inválida.':'una pregunta no es válida',
  'Tema propuesto inválido.':'el tema propuesto no es válido',
@@ -90,35 +94,118 @@ def format_reason(error):
     if isinstance(error,(TypeError,KeyError)):return 'la estructura JSON de la respuesta no es compatible'
     return FORMAT_REASONS.get(str(error),'la respuesta no tiene el formato JSON académico esperado')
 
+_SECTION_LOOKUP={}
+def _fold(value):
+    return ''.join(c for c in unicodedata.normalize('NFD',str(value or '').lower()) if unicodedata.category(c)!='Mn').strip()
+for _s in SECTIONS:
+    _SECTION_LOOKUP[_fold(_s)]=_s
+    _SECTION_LOOKUP[_fold(LABELS[_s])]=_s
+    _SECTION_LOOKUP[_fold(_s).replace('_',' ')]=_s
+
+def section_id(value):
+    """Accept ids, human labels and accent/spacing variants. No guessing beyond that."""
+    key=_fold(value)
+    return _SECTION_LOOKUP.get(key) or _SECTION_LOOKUP.get(key.replace(' ','_')) or (value if value in SECTIONS else None)
+
+def _coerce_text(value):
+    """Chat models sometimes send the draft as a list of paragraphs or an object."""
+    if isinstance(value,str):return value
+    if isinstance(value,(list,tuple)):
+        parts=[_coerce_text(x) for x in value[:200]]
+        return '\n\n'.join(x for x in parts if isinstance(x,str) and x.strip()) or None
+    if isinstance(value,dict):
+        for k in ('text','contenido','borrador','content','body'):
+            if k in value:
+                found=_coerce_text(value[k])
+                if found:return found
+    return None
+
+_SOURCE_ID=re.compile(r'^[FD]\d{1,9}$')
+def _coerce_sources(value):
+    """Keep only well-formed F#/D# ids; dicts, ints and prose are normalized/dropped."""
+    if not isinstance(value,list):return []
+    out=[]
+    for item in value[:50]:
+        if isinstance(item,str):candidate=item.strip()
+        elif isinstance(item,dict):
+            candidate=next((str(item[k]).strip() for k in ('id','ref','marker','source') if isinstance(item.get(k),str)),'')
+        elif type(item) is int:candidate='F'+str(item)
+        else:continue
+        if _SOURCE_ID.fullmatch(candidate) and candidate not in out:out.append(candidate)
+    return out
+
+def _fit_draft(text):
+    """Never reject a usable draft for being too long: cut at a paragraph boundary
+    and say so INSIDE the draft, so the user sees what happened and can continue."""
+    text=text.strip()
+    if len(text)<=MAX_DRAFT_CHARS:return text
+    notice='\n\n[Borrador recortado por el límite local de '+str(MAX_DRAFT_CHARS)+' caracteres. Continúa en el siguiente paso; no se inventó contenido.]'
+    room=MAX_DRAFT_CHARS-len(notice)
+    cut=text.rfind('\n\n',int(room*.6),room)
+    if cut<0:cut=text.rfind('\n',int(room*.6),room)
+    if cut<0:cut=room
+    return text[:cut].rstrip()+notice
+
+def _task_draft(raw,task,extra_sources=None):
+    if not isinstance(raw,dict):return None
+    value=raw.get('text',raw.get('borrador',raw.get('contenido',raw.get('content'))))
+    body=_coerce_text(value)
+    if not body or not body.strip():return None
+    sources=raw.get('sources',raw.get('fuentes',extra_sources or []))
+    return {'section':task['section'],'text':_fit_draft(body),'sources':_coerce_sources(sources)}
+
+TASK_KEYS={'text','sources','reply','questions','question','search','drafts','facts','topic',
+           'borrador','contenido','borradores','fuentes','resumen','apartado','section','seccion','draft'}
+TASK_MARKERS=('text','borrador','contenido','draft','drafts','borradores')
+
 def unpack(text,task=None):
-    if not isinstance(text,str) or len(text)>45000:raise ValueError('Respuesta del modelo vacía o demasiado larga.')
+    if not isinstance(text,str) or len(text)>MAX_RESPONSE_CHARS:raise ValueError('Respuesta del modelo vacía o demasiado larga.')
     result=parse_json(text)
-    if task and isinstance(result,dict) and ('text' in result or 'drafts' in result):
-        # facts/topic are discarded here (an automatic task is never a user statement);
-        # accepting their presence avoids a false format error from chatty models.
-        allowed={'text','sources','reply','questions','question','search','drafts','facts','topic'}
-        if set(result)-allowed:raise ValueError('Respuesta de tarea incompatible.')
-        incoming=result.get('drafts',[]);drafts=[]
+    long_reply=isinstance(result.get('reply'),str) and len(result['reply'])>=1200 if isinstance(result,dict) else False
+    if task and isinstance(result,dict) and (any(k in result for k in TASK_MARKERS) or long_reply):
+        # In a task we already know the target section: ignore the model's own
+        # "section" spelling, accept common Spanish aliases, and normalize every
+        # optional field. Only genuinely unusable content is rejected.
+        if set(result)-TASK_KEYS:raise ValueError('Respuesta de tarea incompatible.')
+        incoming=result.get('drafts',result.get('borradores',result.get('draft',[])))
+        if isinstance(incoming,dict):incoming=[incoming]
+        drafts=[]
         if isinstance(incoming,list):
-            for d in incoming[:2]:
-                if not isinstance(d,dict):continue
-                d=dict(d);d.setdefault('section',task['section'])
-                if not isinstance(d.get('sources'),list):d['sources']=[]
-                drafts.append(d)
-        if isinstance(result.get('text'),str):
-            sources=result.get('sources',[])
-            drafts.append({'section':task['section'],'text':result['text'],'sources':sources if isinstance(sources,list) else []})
-        reply=result.get('reply')
-        if not isinstance(reply,str) or not 1<=len(reply)<=10000:reply='Borrador preparado.'
-        result={'reply':reply,'drafts':drafts[:2],'questions':result.get('questions',[]),'question':result.get('question'),'search':result.get('search')}
+            for raw in incoming[:2]:
+                made=_task_draft(raw,task,result.get('sources',result.get('fuentes')))
+                if made:drafts.append(made)
+        if not drafts:
+            for key in ('text','borrador','contenido','draft'):
+                if isinstance(result.get(key),str):
+                    made=_task_draft({'text':result[key],'sources':result.get('sources',result.get('fuentes',[]))},task)
+                    if made:drafts.append(made)
+                    break
+        reply=result.get('reply',result.get('resumen'))
+        if not isinstance(reply,str) or not 1<=len(reply)<=MAX_REPLY_CHARS:reply='Borrador preparado.'
+        if not drafts and len(reply)>=1200 and (reply.count('\n')>=2 or reply.count('. ')>=3):
+            # Last resort: the model put the whole section in "reply".
+            drafts.append({'section':task['section'],'text':_fit_draft(reply),'sources':[]})
+            reply='Borrador preparado a partir del texto de la respuesta; revisa su estructura y las fuentes.'
+        questions=result.get('questions',[])
+        if not isinstance(questions,list):questions=[]
+        legacy=result.get('question')
+        if not isinstance(legacy,dict):legacy=None
+        search=result.get('search')
+        if not isinstance(search,dict):search=None
+        result={'reply':reply,'drafts':drafts[:2],'questions':questions,'question':legacy,'search':search}
     if not isinstance(result,dict) or set(result)-{'reply','facts','drafts','question','questions','search','topic'}:raise ValueError('Respuesta estructurada no compatible.')
-    if not isinstance(result.get('reply'),str) or not 1<=len(result['reply'])<=10000:raise ValueError('Falta explicación utilizable.')
+    if not isinstance(result.get('reply'),str) or not 1<=len(result['reply'])<=MAX_REPLY_CHARS:raise ValueError('Falta explicación utilizable.')
     for name,maximum in [('facts',12),('drafts',2)]:
         if not isinstance(result.get(name,[]),list) or len(result.get(name,[]))>maximum:raise ValueError('Demasiadas propuestas en '+name)
     for f in result.get('facts',[]):
         if not isinstance(f,dict) or f.get('key') not in FACT_KEYS or any(not isinstance(f.get(k),str) or not f[k].strip() for k in ('value','evidence')) or len(f['value'])>12000 or len(f['evidence'])>6000:raise ValueError('Propuesta de dato inválida.')
     for d in result.get('drafts',[]):
-        if not isinstance(d,dict) or d.get('section') not in SECTIONS or not isinstance(d.get('text'),str) or not 1<=len(d['text'])<=10000 or not isinstance(d.get('sources'),list) or any(not isinstance(x,str) for x in d['sources']):raise ValueError('Propuesta de apartado inválida.')
+        if not isinstance(d,dict):raise ValueError('Borrador con estructura inválida.')
+        sid=section_id(d.get('section'))
+        if sid not in SECTIONS:raise ValueError('Apartado de borrador no reconocido.')
+        body=_coerce_text(d.get('text'))
+        if not body or not body.strip():raise ValueError('Texto de borrador ausente.')
+        d['section']=sid;d['text']=_fit_draft(body);d['sources']=_coerce_sources(d.get('sources'))
     questions=result.get('questions',[])
     if not isinstance(questions,list) or len(questions)>len(FACT_KEYS):raise ValueError('Bloque de preguntas inválido.')
     if result.get('question') is not None:questions=questions+[result['question']]
@@ -128,6 +215,7 @@ def unpack(text,task=None):
     if title is not None and (not isinstance(title,dict) or not isinstance(title.get('text'),str) or not 1<=len(title['text'])<=1500 or not isinstance(title.get('evidence'),str) or not 1<=len(title['evidence'])<=6000):raise ValueError('Tema propuesto inválido.')
     s=result.get('search')
     if s is not None and (not isinstance(s,dict) or not isinstance(s.get('query'),str) or not 2<=len(s['query'])<=250 or not isinstance(s.get('reason'),str) or len(s['reason'])>1000):raise ValueError('Búsqueda inválida.')
+    result.setdefault('drafts',[])  # stable shape even when the model sent no draft
     return result
 
 def context(p,user_text,research_enabled=False,search_notice='',origin='usuario',work_order=None,material=(),allowed_material_ids=None):
